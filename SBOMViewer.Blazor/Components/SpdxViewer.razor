@@ -1,4 +1,4 @@
-﻿@using System.Text.Json
+@using System.Text.Json
 @using System.Text.Json.Serialization
 @using SBOMViewer.Blazor.Models.Spdx
 
@@ -78,7 +78,7 @@
             <Collapse @ref="collapseFiles" Horizontal="false">
                 <div class="info-container">
                     <div class="scroll-container">
-                        @foreach (var file in Document.Files)
+                        @foreach (var file in Document.Files.OrderBy(f => f.FileName))
                         {
                             <details>
                                 <summary>@file.FileName</summary>
@@ -108,7 +108,7 @@
             <Collapse @ref="collapsePackages" Horizontal="false">
                 <div class="info-container">
                     <div class="scroll-container">
-                        @foreach (var package in Document.Packages)
+                        @foreach (var package in Document.Packages.OrderBy(p => p.Name))
                         {
                             <details>
                                 <summary>@package.Name</summary>
@@ -157,3 +157,4 @@
         </CardBody>
     </Card>
 }
+

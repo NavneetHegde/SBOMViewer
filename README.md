@@ -7,7 +7,13 @@
 
 This web application provides an interactive and user-friendly interface for viewing and exploring parsed SPDX and SBOM-tool JSON files. Built with Blazor WebAssembly, the app loads and displays the data in a structured, readable format, making it easy for users to analyze software components, licenses, and dependencies directly in their browser.
 
-## Current Version: 1.0.0
+## Current Version: 1.0.1
+
+## Improvements
+
+- Improved SPDX display by updating filenames to appear in an ordered list.
+
+## Version: 1.0.0
 
 ## Key Features
 
