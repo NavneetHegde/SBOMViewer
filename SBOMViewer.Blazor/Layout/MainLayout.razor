@@ -1,99 +1,99 @@
-@using SBOMViewer.Blazor.Pages
 @inherits LayoutComponentBase
+@inject SbomState SbomState
 
-<div class="layout-container">
-    <header class="header">
-        <div class="container">
-            <h1>SBOM Viewer</h1>
-        </div>
-    </header>
+@code {
+    private DesignThemeModes ThemeMode = DesignThemeModes.System;
 
-    <main class="content">
-        <Home />
-    </main>
+    private void SelectTheme()
+    {
+        ThemeMode = ThemeMode == DesignThemeModes.Light ? DesignThemeModes.Dark : DesignThemeModes.Light;
+    }
+}
+<FluentDesignTheme Mode="@ThemeMode" StorageName="theme" OfficeColor="OfficeColor.Windows" />
+<div class="app-container">
+    <FluentLayout Style="height:100vh; display:flex; flex-direction:column;">
 
-    <footer class="footer">
-        <div class="container">
-            <p>© 2025. Licensed under the MIT License. v1.0.1</p>
-        </div>
-    </footer>
+        <!-- Header -->
+        <FluentHeader>
+            <FluentStack HorizontalAlignment="HorizontalAlignment.Center" VerticalAlignment="VerticalAlignment.Center">
+                <span style="font-size:2rem; font-weight:bold; font-family:'Segoe UI Semibold', 'Segoe UI', sans-serif;">
+                    SBOM Viewer
+                </span>
+            </FluentStack>
+            <FluentButton Appearance="Appearance.Accent" IconStart="@(new Icons.Regular.Size20.DarkTheme())" OnClick="SelectTheme" Title="Theme" />
+        </FluentHeader>
+
+
+        <!-- Main Content -->
+        <FluentStack Class="main" Orientation="Orientation.Vertical" Width="100%"
+                     Style="flex:1; overflow:hidden; padding:0rem; gap:0rem;">
+
+            <!-- Toolbar -->
+            <FluentToolbar id="toolbar-fluent-components-two">
+                <UploadFile />
+            </FluentToolbar>
+
+            <!-- Scrollable Content -->
+            <FluentBodyContent Class="body-content" Style="flex:1; overflow:auto;">
+                <ErrorBoundary>
+                    <ChildContent>
+                        <div class="content" style="padding:1rem; border:1px solid var(--neutral-stroke-1); border-radius:0.5rem; min-height:400px;">
+                            @Body
+                        </div>
+                    </ChildContent>
+                    <ErrorContent Context="ex">
+                        <div class="blazor-error-boundary">@ex.Message</div>
+                    </ErrorContent>
+                </ErrorBoundary>
+            </FluentBodyContent>
+        </FluentStack>
+
+        <!-- Footer -->
+        <FluentFooter Style="padding:0.5rem; display:flex; justify-content:center; align-items:center; font-size:0.85rem; color:var(--neutral-foreground-2); border-top:1px solid var(--neutral-stroke-1); flex-shrink:0;">
+            © 2025. Licensed under the MIT License. SBOM Viewer v2.0.0
+        </FluentFooter>
+
+    </FluentLayout>
 </div>
-<Preload LoadingText="Loading..." />
 
-<style>
-    html, body {
-        height: 100%;
-        margin: 0;
-        font-family: 'Roboto Mono', 'Consolas', 'Courier New', 'Lucida Console', monospace;
-        background-color: #BDC3C7;
-    }
+@code {
 
-    .layout-container {
-        display: flex;
-        flex-direction: column;
-        min-height: 100vh;
-    }
+    private SbomFormat SelectedSbomFormat = SbomFormat.CycloneDX_1_6;
 
-    .header {
-        background-color: #0a1a2a;
-        color: #ffffff;
-        padding: 10px 0;
-        text-align: center;
-        border-bottom: 1px solid #dee2e6;
-        position: sticky;
-        top: 0;
-        z-index: 1000; /* Keeps the header on top of other content */
-        width: 100%;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Optional: Adds a shadow for the header */
-    }
-
-        .header .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-    .logo {
-        height: 40px;
-        margin-right: 10px;
-    }
-
-    .content {
-        flex: 1;
-        overflow-y: auto; /* Allows content to scroll */
-        padding: 1rem;
-        margin-top: 10px; /* Optional: Adds spacing to avoid overlap with the header */
-        margin-bottom: 20px; /* Optional: Adds spacing to avoid overlap with the footer */
-    }
-
-    .footer {
-        background-color: #0a1a2a;
-        color: #f0f4f8;
-        padding: 0px 0;
-        text-align: center;
-        border-top: 1px solid #0a1a2a;
-        position: sticky;
-        bottom: 0;
-        z-index: 1000; /* Keeps the footer on top of other content */
-        width: 100%;
-        box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.1); /* Optional: Adds a shadow for the footer */
-    }
-
-        .footer .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 1px;
-        }
-
-        .footer a {
-            color: #007bff;
-            text-decoration: none;
-        }
-
-            .footer a:hover {
-                text-decoration: underline;
+    private string SelectedSbomFormatString
+    {
+        get => SelectedSbomFormat.ToString();
+        set
+        {
+            if (Enum.TryParse<SbomFormat>(value, out var result))
+            {
+                SelectedSbomFormat = result;
             }
-</style>
+        }
+    }
+
+    async Task OnCompleted(IEnumerable<FluentInputFileEventArgs> files)
+    {
+        foreach (var file in files)
+        {
+            if (file?.Stream is null)
+                continue;
+
+            using var reader = new StreamReader(file.Stream);
+            string content = await reader.ReadToEndAsync();
+
+            if (SelectedSbomFormat == SbomFormat.SPDX_2_2)
+            {
+                SbomState.SpdxData = SpdxParser.ParseSpdxJsonAsync(content).Result;
+                SbomState.SpdxFileName = file.Name;
+            }
+            else if (SelectedSbomFormat == SbomFormat.CycloneDX_1_6)
+            {
+                SbomState.CycloneDXData = CycloneDXParser.ParseCycloneDXBomJsonAsyncParseJson(content).Result;
+                SbomState.CycloneDXFileName = file.Name;
+            }
+        }
+
+        StateHasChanged(); // refresh MainLayout + pages
+    }
+}

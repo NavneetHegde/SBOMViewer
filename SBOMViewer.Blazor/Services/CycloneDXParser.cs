@@ -1,4 +1,4 @@
-﻿using SBOMViewer.Blazor.Models.CycloneDX;
+using SBOMViewer.Blazor.Models.CycloneDX;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 

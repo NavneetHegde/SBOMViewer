@@ -1,84 +1,87 @@
-@using System.Text.Json
-@using System.Text.Json.Serialization
 @using SBOMViewer.Blazor.Models.Spdx
+@using Microsoft.FluentUI.AspNetCore.Components
 
 @code {
+    [Parameter] public SpdxDocument? Document { get; set; }
+    [Parameter] public string? DocumentFileName { get; set; }
 
-    private Collapse? collapseGeneralInfo;
-    private Collapse? collapseCreationInfo;
-    private Collapse? collapseFiles;
-    private Collapse? collapsePackages;
-    private Collapse? collapseRelationships;
-    private Collapse? collapseMain;
-
-    [Parameter]
-    public SpdxDocument? Document { get; set; }
-
-    [Parameter]
-    public string? DocumentFileName { get; set; }
-
-    private bool isExpanded;
-    private string ChevronStyle => isExpanded ? "transform: rotate(180deg);" : "transform: rotate(0deg);";
-
-    private async Task ToggleAsync(Collapse? collapse)
-    {
-        if (collapse is not null)
-        {
-            await collapse.ToggleAsync();
-        }
-    }
+    private string fileSearch = string.Empty;
+    private string packageSearch = string.Empty;
 }
 
 @if (Document != null)
 {
-    <Card Style="background-color:#3e556b">
-        <CardHeader Style="color:white"><strong>File Name : </strong>@DocumentFileName</CardHeader>
+    <FluentCard Style="background-color:var(--neutral-layer1); color:var(--neutral-foreground-rest); padding:1rem;">
+        <!-- Document Filename Centered -->
+        <div style="display:flex; align-items:center; justify-content:center; gap:0.5rem; margin-bottom:1rem;">
+            <FluentIcon Value="@(new Icons.Regular.Size24.DocumentTextExtract())" />
+            <span style="font-weight:bold; font-size:1.1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+                  title="@DocumentFileName">
+                @DocumentFileName
+            </span>
+        </div>
 
-        <CardBody>
+        <FluentAccordion>
+
             <!-- General Information -->
-            <h4 class="collapsible-header" @onclick="() => ToggleAsync(collapseGeneralInfo)">
-                <span>General Information</span>
-                <i class="chevron-icon" style="@ChevronStyle"></i>
-            </h4>
+            <FluentAccordionItem Expanded="true">
+                <HeadingTemplate>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <FluentIcon Value="@(new Icons.Regular.Size24.Info())" />
+                        <span>General Information</span>
+                    </div>
+                </HeadingTemplate>
+                <ChildContent>
+                    <div class="info-container">
+                        <div><span><strong>Name:</strong> @Document.Name </span></div>
+                        <div><span><strong>SPDX Version:</strong> @Document.SpdxVersion</span></div>
+                        <div><span><strong>Data License:</strong> @Document.DataLicense</span></div>
+                        <div><span><strong>Document Namespace:</strong> @Document.DocumentNamespace</span></div>
+                    </div>
+                </ChildContent>
+            </FluentAccordionItem>
 
-            <Collapse @ref="collapseGeneralInfo" Horizontal="false">
-                <div class="info-container">
-                    <div><span><strong>Name:</strong> @Document.Name </span></div>
-                    <div><span><strong>SPDX Version:</strong> @Document.SpdxVersion</span></div>
-                    <div><span><strong>Data License:</strong> @Document.DataLicense</span></div>
-                    <div><span><strong>Document Namespace:</strong> @Document.DocumentNamespace</span></div>
-                </div>
-            </Collapse>
+            <!-- Creation Information -->
+            <FluentDivider />
+            <FluentAccordionItem Expanded="true">
+                <HeadingTemplate>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <FluentIcon Value="@(new Icons.Regular.Size24.Tab())" />
+                        <span>Creation Information</span>
+                    </div>
+                </HeadingTemplate>
+                <ChildContent>
+                    <div class="info-container">
+                        <div><span><strong>Created:</strong> @Document.CreationInfo.Created</span></div>
+                        <div><span><strong>Creators:</strong></span></div>
+                        <ul>
+                            @foreach (var creator in Document.CreationInfo.Creators)
+                            {
+                                <li>@creator</li>
+                            }
+                        </ul>
+                    </div>
+                </ChildContent>
+            </FluentAccordionItem>
 
-            <!-- Creation Info -->
-            <h4 class="collapsible-header" @onclick="() => ToggleAsync(collapseCreationInfo)">
-                <span>Creation Info</span>
-                <i class="chevron-icon" style="@ChevronStyle"></i>
-            </h4>
+            <!-- Files-->
+            <FluentDivider />
+            <FluentAccordionItem>
+                <HeadingTemplate>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <FluentIcon Value="@(new Icons.Regular.Size24.Layer())" />
+                        <span>Files | @Document.Files.Count()</span>
+                    </div>
+                </HeadingTemplate>
+                <ChildContent>
+                    <!-- Search Input -->
+                    <FluentSearch @bind-Value="fileSearch" Style="width:100%" Placeholder="Search file" AutoComplete="off" />
 
-            <Collapse @ref="collapseCreationInfo" Horizontal="false">
-                <div class="info-container">
-                    <div><span><strong>Created:</strong> @Document.CreationInfo.Created</span></div>
-                    <div><span><strong>Creators:</strong></span></div>
-                    <ul>
-                        @foreach (var creator in Document.CreationInfo.Creators)
-                        {
-                            <li>@creator</li>
-                        }
-                    </ul>
-                </div>
-            </Collapse>
-
-            <!-- Files -->
-            <h4 class="collapsible-header" @onclick="() => ToggleAsync(collapseFiles)">
-                <span>Files | #@Document.Files.Count()</span>
-                <i class="chevron-icon" style="@ChevronStyle"></i>
-            </h4>
-
-            <Collapse @ref="collapseFiles" Horizontal="false">
-                <div class="info-container">
-                    <div class="scroll-container">
-                        @foreach (var file in Document.Files.OrderBy(f => f.FileName))
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        @foreach (var file in Document.Files
+                                            .Where(f => string.IsNullOrWhiteSpace(fileSearch)
+                                            || f.FileName.Contains(fileSearch, StringComparison.OrdinalIgnoreCase))
+                                            .OrderBy(f => f.FileName))
                         {
                             <details>
                                 <summary>@file.FileName</summary>
@@ -95,23 +98,30 @@
                             </details>
                         }
                     </div>
-                </div>
-            </Collapse>
+                </ChildContent>
+            </FluentAccordionItem>
 
+            <!-- Packages-->
+            <FluentDivider />
+            <FluentAccordionItem>
+                <HeadingTemplate>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <FluentIcon Value="@(new Icons.Regular.Size24.Box())" />
+                        <span>Packages | @Document.Packages.Count()</span>
+                    </div>
+                </HeadingTemplate>
+                <ChildContent>
+                    <!-- Search input -->
+                    <FluentSearch @bind-Value="packageSearch" Placeholder="Search packages" AutoComplete="off" Style="width:100%" />
 
-            <!-- Packages -->
-            <h4 class="collapsible-header" @onclick="() => ToggleAsync(collapsePackages)">
-                <span>Packages | #@Document.Packages.Count()</span>
-                <i class="chevron-icon" style="@ChevronStyle"></i>
-            </h4>
-
-            <Collapse @ref="collapsePackages" Horizontal="false">
-                <div class="info-container">
-                    <div class="scroll-container">
-                        @foreach (var package in Document.Packages.OrderBy(p => p.Name))
+                    <div class="scroll-container" style="max-height:400px; overflow-y:auto; padding-right:0.5rem;">
+                        @foreach (var package in Document.Packages
+                                            .Where(p => string.IsNullOrWhiteSpace(packageSearch)
+                                            || p.Name.Contains(packageSearch, StringComparison.OrdinalIgnoreCase))
+                                            .OrderBy(p => p.Name))
                         {
                             <details>
-                                <summary>@package.Name</summary>
+                                <summary>@package.Name (@package.VersionInfo)</summary>
                                 <div><span><strong>SpdxId:</strong> @package.SpdxId</span></div>
                                 <div><span><strong>Version:</strong> @package.VersionInfo</span></div>
                                 <div><span><strong>FilesAnalyzed:</strong> @package.FilesAnalyzed</span></div>
@@ -132,18 +142,20 @@
                             </details>
                         }
                     </div>
-                </div>
-            </Collapse>
+                </ChildContent>
+            </FluentAccordionItem>
 
-            <!-- Relationships -->
-            <h4 class="collapsible-header" @onclick="() => ToggleAsync(collapseRelationships)">
-                <span>Relationships | #@Document.Packages.Count()</span>
-                <i class="chevron-icon" style="@ChevronStyle"></i>
-            </h4>
-
-            <Collapse @ref="collapseRelationships" Horizontal="false">
-                <div class="info-container">
-                    <div class="scroll-container">
+            <!-- Relationships-->
+            <FluentDivider />
+            <FluentAccordionItem>
+                <HeadingTemplate>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <FluentIcon Value="@(new Icons.Regular.Size24.Link())" />
+                        <span>Relationships | @Document.Packages.Count()</span>
+                    </div>
+                </HeadingTemplate>
+                <ChildContent>
+                    <div class="scroll-container" style="max-height:400px; overflow-y:auto; padding-right:0.5rem;">
                         @foreach (var relationship in Document.Relationships)
                         {
                             <details>
@@ -152,9 +164,9 @@
                             </details>
                         }
                     </div>
-                </div>
-            </Collapse>
-        </CardBody>
-    </Card>
+                </ChildContent>
+            </FluentAccordionItem>
+        </FluentAccordion>
+    </FluentCard>
 }
 

@@ -1,0 +1,104 @@
+@inject SbomState SbomState
+
+<!-- Container -->
+<FluentStack Orientation="Orientation.Horizontal" HorizontalAlignment="HorizontalAlignment.Center" Style="max-width:800px; margin:auto; padding:1rem; gap:1rem;">
+
+    <!-- Format Selection -->
+    <FluentSelect TOption="SbomFormat" @bind-Value="SelectedSbomFormatString" Appearance="Appearance.Stealth" Style="width:300px;">
+        @foreach (var format in Enum.GetValues<SbomFormat>())
+        {
+            <FluentOption Value="@format.ToString()">@format</FluentOption>
+        }
+    </FluentSelect>
+
+    <!-- File Upload -->
+    <FluentInputFile AnchorId="MyUploadStream"
+                     DragDropZoneVisible="false"
+                     Mode="InputFileMode.Stream"
+                     Multiple="false"
+                     MaximumFileSize="@(20 * 1024 * 1024)"
+                     Accept=".json"
+                     OnCompleted="@OnCompleted" />
+
+    <FluentButton Appearance="Appearance.Accent" Id="MyUploadStream">
+        Upload files
+    </FluentButton>
+</FluentStack>
+@if (isLoading)
+{
+    <div style="
+                position:fixed;
+                top:0; left:0; right:0; bottom:0;
+                background-color:rgba(0,0,0,0.5);
+                display:flex;
+                justify-content:center;
+                align-items:center;
+                z-index:1000;">
+        <FluentProgress Min="0" Max="100" Value="0" IsIndeterminate="true" />
+        <span style="color:white; margin-left:1rem;">Loading SBOM...</span>
+    </div>
+}
+
+
+
+@code {
+
+    string? fileContent;
+    private bool isLoading = false;
+
+    async Task OnCompleted(IEnumerable<FluentInputFileEventArgs> files)
+    {
+        if (files == null || !files.Any()) return;
+
+        isLoading = true;
+        StateHasChanged();
+
+        foreach (var file in files)
+        {
+            if (file?.Stream == null) continue;
+
+            using var reader = new StreamReader(file.Stream);
+            string content = await reader.ReadToEndAsync();
+
+            if (SelectedSbomFormat == SbomFormat.SPDX_2_2)
+            {
+                SbomState.SpdxData = SpdxParser.ParseSpdxJsonAsync(content).Result;
+                SbomState.SpdxFileName = file.Name;
+
+                // Clear CycloneDX
+                SbomState.CycloneDXData = null;
+                SbomState.CycloneDXFileName = null;
+            }
+            else if (SelectedSbomFormat == SbomFormat.CycloneDX_1_6)
+            {
+                SbomState.CycloneDXData = CycloneDXParser.ParseCycloneDXBomJsonAsyncParseJson(content).Result;
+                SbomState.CycloneDXFileName = file.Name;
+
+                // Clear SPDX
+                SbomState.SpdxData = null;
+                SbomState.SpdxFileName = null;
+            }
+        }
+
+        isLoading = false;
+        StateHasChanged();
+    }
+
+
+
+    // The actual enum value
+    private SbomFormat SelectedSbomFormat = SbomFormat.CycloneDX_1_6;
+
+    // The string bound to the FluentSelect
+    private string SelectedSbomFormatString
+    {
+        get => SelectedSbomFormat.ToString();
+        set
+        {
+            if (Enum.TryParse<SbomFormat>(value, out var result))
+            {
+                SelectedSbomFormat = result;
+            }
+        }
+    }
+}
