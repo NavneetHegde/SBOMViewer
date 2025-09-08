@@ -1,15 +1,28 @@
 ﻿# Changelog
 
-All notable changes to this project will be documented in this file.
+## [2.0.0] – Current
 
-## [1.0.0] - 2025-02-28
-### Added
-- Initial release of the Blazor WebAssembly project.
-- Basic setup for the app with essential features:
-  - Parsing and displaying SPDX and SBOM-tool JSON files in a user-friendly UI.
-  - Use of native Blazor components for frontend development.
-- Configured `.gitignore` to exclude build and IDE files.
-- Added `.editorconfig` for consistent code styling across editors.
+### Improvements
+- Complete UI overhaul using **Fluent UI components** for a modern, consistent, and responsive look.
+- **Automatic clearing** of previous SBOM data when a new file is uploaded, ensuring viewers display only the current file.
+- Enhanced layout and styling for **SPDX and CycloneDX viewers**, improving readability and user experience.
 
+---
+
+## [1.0.1]
+
+### Improvements
+- Improved SPDX display by presenting filenames in a **clear, ordered list**.
+
+---
+
+## [1.0.0]
+
+### Key Features
+- Displays parsed **SPDX** and **CycloneDX** JSON data in a clean, hierarchical view.
+- Fully **client-side rendering** using Blazor WebAssembly for fast and responsive interactions.
+- Modern, consistent UI built with **Fluent UI components**.
+- Lightweight and maintainable design using **native Blazor components**.
+- Easy navigation of nested data structures for better exploration of complex SBOM files.
 ### Known Issues
 - No major issues at the moment.

@@ -11,21 +11,16 @@ SBOM Viewer is a web application built with Blazor WebAssembly that provides an 
 
 It loads data directly in the browser and presents it in a structured, hierarchical format—making it easy to analyze software components, licenses, and dependencies without additional tools.
 
-## Current Version: 1.0.1
+## Latest Release
 
-## Improvements
+**Version 2.0.0** – Revamped UI and Fluent UI integration
 
-- Improved SPDX display by updating filenames to appear in an ordered list.
+- Modern, consistent UI using Fluent UI components
+- Automatic clearing of previous SBOM when a new file is uploaded
+- Enhanced SPDX and CycloneDX viewers for better readability
 
-## Version: 1.0.0
+For the complete history of changes, see [CHANGELOG.md](./CHANGELOG.md).
 
-## Key Features
-
-- Displays parsed SPDX and CycloneDX JSON data in a clean, hierarchical view.
-- Fully client-side rendering using Blazor WebAssembly for fast and responsive interactions.
-- Modern and consistent UI built with Fluent UI components.
-- Lightweight and maintainable design using native Blazor components.
-- Easy navigation of nested data structures for better exploration of complex SBOM files.
 
 ## Installation
 
