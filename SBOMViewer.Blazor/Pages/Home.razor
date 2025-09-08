@@ -1,103 +1,37 @@
-﻿@page "/"
-@inject IJSRuntime JSRuntime
+@page "/"
+@inject SbomState SbomState
 
-<PageTitle>SBOM Viewer</PageTitle>
+<FluentStack Orientation="Orientation.Vertical" Style="gap:1.5rem;">
 
-<div class="container">
-
-    <!-- Format Selection -->
-    <div class="row">
-        <div class="col-md-6 offset-md-3 mb-4">
-            <select id="bomFormat" class="form-select" @bind="selectedSbomFormat">
-                @foreach (var format in Enum.GetValues<SbomFormat>())
-                {
-                    <option value="@format">@format</option>
-                }
-            </select>
-        </div>
-    </div>
-
-    <!-- File Upload -->
-    <div class="row">
-        <div class="col-md-6 offset-md-3 text-center mb-4">
-            <InputFile OnChange="HandleFileSelected" draggable="true" accept=".json" class="btn btn-secondary" />
-        </div>
-    </div>
-
-    <!-- Viewers (Stacked on top of each other) -->
-    @if (cycloneDXData != null || spdxData != null)
+    @if (SbomState.CycloneDXData is not null)
     {
-        <div class="row mt-4">
-            <div class="col-md-12 mb-4">
-                <CycloneDXViewer Document="@cycloneDXData" DocumentFileName="@cycloneDXFileName" />
-            </div>
-            <div class="col-md-12">
-                <SpdxViewer Document="@spdxData" DocumentFileName="@spdxFileName" />
-            </div>
-        </div>
+        <CycloneDXViewer Document="@SbomState.CycloneDXData"
+                         DocumentFileName="@SbomState.CycloneDXFileName" />
     }
-</div>
+
+    @if (SbomState.SpdxData is not null)
+    {
+        <SpdxViewer Document="@SbomState.SpdxData"
+                    DocumentFileName="@SbomState.SpdxFileName" />
+    }
+
+    @if (SbomState.CycloneDXData is null && SbomState.SpdxData is null)
+    {
+        <FluentCard Style="padding:1rem; text-align:center; color:var(--neutral-foreground-2);">
+            No SBOM loaded yet. Please select a format and upload a file.
+        </FluentCard>
+    }
+
+</FluentStack>
 
 @code {
-
-    [Inject]
-    protected PreloadService? PreloadService { get; set; }
-
-    private SbomFormat selectedSbomFormat = SbomFormat.CycloneDX_1_6;
-
-    string? fileContent;
-    CycloneDXDocument? cycloneDXData;
-    SpdxDocument? spdxData;
-    string? spdxFileName, cycloneDXFileName;
-    string? FileName;
-
-    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    protected override void OnInitialized()
     {
-        // Get the selected file
-        try
-        {
-            var file = e?.File;
-            FileName = file?.Name?.ToString();
-
-            PreloadService?.Show();
-
-            // Open a stream for the file (set an appropriate max size if needed)
-            using var stream = file?.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024); // 10 MB limit
-
-            if (stream == null)
-                throw new NullReferenceException();
-
-            using var reader = new StreamReader(stream);
-            fileContent = await reader.ReadToEndAsync();
-
-            // Parse for selected format and set the filename and parsed document
-            if (selectedSbomFormat == SbomFormat.SPDX_2_2)
-            {
-                spdxData = SpdxParser.ParseSpdxJsonAsync(fileContent).Result;
-                spdxFileName = FileName;
-            }
-            if (selectedSbomFormat == SbomFormat.CycloneDX_1_6)
-            {
-                cycloneDXData = CycloneDXParser.ParseCycloneDXBomJsonAsyncParseJson(fileContent).Result;
-                cycloneDXFileName = FileName;
-            }
-
-        }
-        catch (Exception)
-        {
-            // throw;
-        }
-        finally
-        {
-            // Hide the waiting screen
-            PreloadService?.Hide();
-        }
+        SbomState.OnChange += StateHasChanged;
     }
 
-    private enum SbomFormat
+    public void Dispose()
     {
-        CycloneDX_1_6,
-        SPDX_2_2
+        SbomState.OnChange -= StateHasChanged;
     }
-
 }

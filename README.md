@@ -1,26 +1,27 @@
 ﻿
-# SPDX and SBOM-Tool JSON Viewer
-[SBOM Viewer](https://sbomviewer.com)  
-![SBOM Viewer](./sbomviewer.jpeg)
+# SPDX & CycloneDX JSON Viewer
+*A modern web-based viewer for SPDX & CycloneDX SBOMs.*
 
+[**SBOM Viewer**](https://sbomviewer.com)
 
+<div align="center">
+  <img src="./sbomviewer_v2.jpeg" alt="SBOM Viewer Screenshot" width="600">
+</div>
 
-This web application provides an interactive and user-friendly interface for viewing and exploring parsed SPDX and SBOM-tool JSON files. Built with Blazor WebAssembly, the app loads and displays the data in a structured, readable format, making it easy for users to analyze software components, licenses, and dependencies directly in their browser.
+SBOM Viewer is a web application built with Blazor WebAssembly that provides an interactive, user-friendly interface for viewing and exploring parsed SPDX and CycloneDX JSON files.
 
-## Current Version: 1.0.1
+It loads data directly in the browser and presents it in a structured, hierarchical format—making it easy to analyze software components, licenses, and dependencies without additional tools.
 
-## Improvements
+## Latest Release
 
-- Improved SPDX display by updating filenames to appear in an ordered list.
+**Version 2.0.0** – Revamped UI and Fluent UI integration
 
-## Version: 1.0.0
+- Modern, consistent UI using Fluent UI components
+- Automatic clearing of previous SBOM when a new file is uploaded
+- Enhanced SPDX and CycloneDX viewers for better readability
 
-## Key Features
+For the complete history of changes, see [CHANGELOG.md](./CHANGELOG.md).
 
-- Displays parsed SPDX and SBOM-tool JSON data in a clean, hierarchical view.
-- Fully client-side rendering using Blazor WebAssembly for fast and responsive interactions.
-- Native Blazor components ensure a lightweight and maintainable user interface.
-- Easy navigation of nested data structures for better exploration of complex JSON files.
 
 ## Installation
 
@@ -48,9 +49,9 @@ This web application provides an interactive and user-friendly interface for vie
 
 ## Usage
 
-- Upload or load your SPDX or SBOM-tool JSON file into the application.
-- The data will be parsed and displayed in an easy-to-read format.
-- Navigate through the data structure and view detailed information about software components, licenses, and dependencies.
+- Upload or load your SPDX or CycloneDX JSON file into the application.
+- The data will be parsed and displayed in a clean, easy-to-read format.
+- Navigate through the structured view to explore detailed information about software components, licenses, and dependencies.
 
 ## Technology Stack
 

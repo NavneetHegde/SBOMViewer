@@ -1,176 +1,188 @@
-﻿@using SBOMViewer.Blazor.Models.CycloneDX
-@using System.Text.Json
+@using SBOMViewer.Blazor.Models.CycloneDX
+@using Microsoft.FluentUI.AspNetCore.Components
+
+@code {
+    [Parameter] public CycloneDXDocument? Document { get; set; }
+    [Parameter] public string? DocumentFileName { get; set; }
+
+    private string componentSearch = string.Empty;
+}
 
 @if (Document != null)
 {
-    <Card Style="background-color:#3e556b">
-        <CardHeader Style="color:white"><strong>File Name : </strong>@DocumentFileName</CardHeader>
-        <CardBody>
 
-            <!--General Information-->
-            <h4 class="collapsible-header" @onclick="() => ToggleAsync(collapseGeneralInfo)">
-                <span>General Information</span>
-                <i class="chevron-icon" style="@ChevronStyle"></i>
-            </h4>
+    <FluentCard Style="background-color:var(--neutral-layer1); color:var(--neutral-foreground-rest); padding:1rem;">
+        <!-- Document Filename Centered -->
+        <div style="display:flex; align-items:center; justify-content:center; gap:0.5rem; margin-bottom:1rem;">
+            <FluentIcon Value="@(new Icons.Regular.Size24.DocumentTextExtract())" />
+            <span style="font-weight:bold; font-size:1.1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+                  title="@DocumentFileName">
+                @DocumentFileName
+            </span>
+        </div>
 
-            <Collapse @ref="collapseGeneralInfo" Horizontal="false">
-                <div class="info-container">
-                    <div><span><strong>Format:</strong> @Document.BomFormat</span></div>
-                    <div><span><strong>Spec Version:</strong> @Document.SpecVersion</span></div>
-                    <div><span><strong>Serial Number:</strong> @Document.SerialNumber</span></div>
-                    <div><span><strong>Version:</strong> @Document.Version</span></div>
-                </div>
-            </Collapse>
-
-            <!--Metadata-->
-            <h4 class="collapsible-header" @onclick="() => ToggleAsync(collapseMetadata)">
-                <span>Metadata</span>
-                <i class="chevron-icon" style="@ChevronStyle"></i>
-            </h4>
-
-            <Collapse @ref="collapseMetadata" Horizontal="false">
-                <div class="info-container">
-                    <div><spanp><strong>Timestamp:</strong> @Document.Metadata.Timestamp</spanp></div>
-                    <div><span><strong>Tools:</strong></span></div>
-                    <ul>
-                        @foreach (var tool in Document.Metadata.Tools)
-                        {
-                            <li>@tool.Name (@tool.Vendor) - @tool.Version</li>
-                        }
-                    </ul>
-                </div>
-            </Collapse>
-
-            <!--Components-->
-            <h4 class="collapsible-header" @onclick="() => ToggleAsync(collapseComponents)">
-                <span>Components | #@Document.Components.Count()</span>
-                <i class="chevron-icon" style="@ChevronStyle"></i>
-            </h4>
-
-            <Collapse @ref="collapseComponents" Horizontal="false">
-                <div class="info-container">
-                    <div class="scroll-container">
-                        @foreach (var component in Document.Components)
-                        {
-                            <details>
-                                <summary>@component.Name ( @component.Version  | @component.Scope ) </summary>
-                                <div><span><strong>Description: </strong> @component.Description</span></div>
-                                <div><span><strong>Type: </strong> @component.Type</span></div>
-                                <div><span><strong>Bom-ref :</strong> @component.BomRef</span></div>
-                                <div><span><strong>Copyright:</strong> @component.Copyright</span></div>
-                                <div><span><strong>Purl:</strong> @component.Purl</span></div>
-                                <div><span><strong>Authors</strong></span></div>
-                                <ul>
-                                    @if (component.Authors != null)
-                                    {
-                                        @foreach (var author in component.Authors)
-                                        {
-                                            <li>@author.Name</li>
-                                        }
-                                    }
-                                </ul>
-                                <div><span><strong>Hashes</strong></span></div>
-                                <ul>
-                                    @if (component.Hashes != null)
-                                    {
-                                        @foreach (var hash in component.Hashes)
-                                        {
-                                            <li>@hash.Algorithm : (@hash.Content)</li>
-                                        }
-                                    }
-                                </ul>
-                                <div><span><strong>Licenses</strong></span></div>
-                                <ul>
-                                    @if (component.Licenses != null)
-                                    {
-                                        @foreach (var license in component.Licenses)
-                                        {
-                                            <li>@license.License.Name (@license.License.Id | @license.License.Url)</li>
-                                        }
-                                    }
-                                </ul>
-                                <div><span><strong>ExternalReferences</strong></span></div>
-                                <ul>
-                                    @if (component.ExternalReferences != null)
-                                    {
-                                        @foreach (var extRef in component.ExternalReferences)
-                                        {
-                                            <li>@extRef.Type : @extRef.Url</li>
-                                        }
-                                    }
-                                </ul>
-                            </details>
-                        }
+        <FluentAccordion>
+            <!-- General Information -->
+            <FluentAccordionItem Expanded="true">
+                <HeadingTemplate>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <FluentIcon Value="@(new Icons.Regular.Size24.Info())" />
+                        <span>General Information</span>
                     </div>
-                </div>
-            </Collapse>
+                </HeadingTemplate>
+                <ChildContent>
+                    <div class="info-container">
+                        <div><strong>Format:</strong> @Document.BomFormat</div>
+                        <div><strong>Spec Version:</strong> @Document.SpecVersion</div>
+                        <div><strong>Serial Number:</strong> @Document.SerialNumber</div>
+                        <div><strong>Version:</strong> @Document.Version</div>
+                    </div>
+                </ChildContent>
+            </FluentAccordionItem>
 
-            <!--Dependencies-->
-            <h4 class="collapsible-header" @onclick="() => ToggleAsync(collapseDependencies)">
-                <span>Dependencies | #@Document.Dependencies?.Count()</span>
-                <i class="chevron-icon" style="@ChevronStyle"></i>
-            </h4>
+            <FluentDivider />
 
-            <Collapse @ref="collapseDependencies" Horizontal="false">
-                <div class="info-container">
-                    <div class="scroll-container">
-                        @if (Document.Dependencies != null)
-                        {
-                            @foreach (var dependency in Document.Dependencies)
+            <!-- Metadata -->
+            <FluentAccordionItem Expanded="true">
+                <HeadingTemplate>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <FluentIcon Value="@(new Icons.Regular.Size24.Tab())" />
+                        <span>Metadata</span>
+                    </div>
+                </HeadingTemplate>
+                <ChildContent>
+                    <div>
+                        <div><strong>Timestamp:</strong> @Document.Metadata.Timestamp</div>
+
+                        <div><strong>Tools:</strong></div>
+                        <ul>
+                            @foreach (var tool in Document.Metadata.Tools)
+                            {
+                                <li>@tool.Name (@tool.Vendor) - @tool.Version</li>
+                            }
+                        </ul>
+                    </div>
+                </ChildContent>
+            </FluentAccordionItem>
+
+            <FluentDivider />
+
+            <!-- Components -->
+            <FluentAccordionItem>
+                <HeadingTemplate>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <FluentIcon Value="@(new Icons.Regular.Size24.Layer())" />
+                        <span>Components | @Document.Components.Count()</span>
+                    </div>
+                </HeadingTemplate>
+                <ChildContent>
+                    <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                        <!-- Search Input -->
+                        <FluentSearch @bind-Value="componentSearch" Style="width:100%" Placeholder="Search components" AutoComplete="off" />
+
+                        <!-- Scrollable component list -->
+                        <div class="scroll-container" style="max-height:400px; overflow-y:auto; padding-right:0.5rem;">
+                            @foreach (var component in Document.Components
+                                                    .Where(c => string.IsNullOrWhiteSpace(componentSearch)
+                                                    || c.Name.Contains(componentSearch, StringComparison.OrdinalIgnoreCase))
+                                                    .OrderBy(c => c.Name))
                             {
                                 <details>
-                                    <summary>@dependency.Ref | #@dependency.DependsOn?.Count()</summary>
+                                    <summary>@component.Name (@component.Version | @component.Scope)</summary>
+                                    <div><span><strong>Description: </strong> @component.Description</span></div>
+                                    <div><span><strong>Type: </strong> @component.Type</span></div>
+                                    <div><span><strong>Bom-ref :</strong> @component.BomRef</span></div>
+                                    <div><span><strong>Copyright:</strong> @component.Copyright</span></div>
+                                    <div><span><strong>Purl:</strong> @component.Purl</span></div>
+                                    <div><span><strong>Authors</strong></span></div>
                                     <ul>
-                                        @if (dependency.DependsOn?.Count() > 0)
+                                        @if (component.Authors != null)
                                         {
-                                            @foreach (var depends in dependency.DependsOn)
+                                            @foreach (var author in component.Authors)
                                             {
-                                                if (!string.IsNullOrWhiteSpace(depends?.ToString()))
-                                                {
-                                                    <li class="depends-on">@depends?.ToString()</li>
-                                                }
+                                                <li>@author.Name</li>
+                                            }
+                                        }
+                                    </ul>
+                                    <div><span><strong>Hashes</strong></span></div>
+                                    <ul>
+                                        @if (component.Hashes != null)
+                                        {
+                                            @foreach (var hash in component.Hashes)
+                                            {
+                                                <li>@hash.Algorithm : (@hash.Content)</li>
+                                            }
+                                        }
+                                    </ul>
+                                    <div><span><strong>Licenses</strong></span></div>
+                                    <ul>
+                                        @if (component.Licenses != null)
+                                        {
+                                            @foreach (var license in component.Licenses)
+                                            {
+                                                <li>@license.License.Name (@license.License.Id | @license.License.Url)</li>
+                                            }
+                                        }
+                                    </ul>
+                                    <div><span><strong>ExternalReferences</strong></span></div>
+                                    <ul>
+                                        @if (component.ExternalReferences != null)
+                                        {
+                                            @foreach (var extRef in component.ExternalReferences)
+                                            {
+                                                <li>@extRef.Type : @extRef.Url</li>
                                             }
                                         }
                                     </ul>
                                 </details>
                             }
-                        }
+                        </div>
                     </div>
-                </div>
-            </Collapse>
-        </CardBody>
-    </Card>
+                </ChildContent>
+            </FluentAccordionItem>
+
+            <FluentDivider />
+
+            <!-- Dependencies -->
+            <FluentAccordionItem>
+                <HeadingTemplate>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <FluentIcon Value="@(new Icons.Regular.Size24.Link())" />
+                        <span>Dependencies | @Document.Dependencies?.Count()</span>
+                    </div>
+                </HeadingTemplate>
+                <ChildContent>
+                    <div class="scroll-container" style="max-height:400px; overflow-y:auto; padding-right:0.5rem;">
+                        <div class="scroll-container">
+                            @if (Document.Dependencies != null)
+                            {
+                                @foreach (var dependency in Document.Dependencies)
+                                {
+                                    <details>
+                                        <summary>@dependency.Ref | #@dependency.DependsOn?.Count()</summary>
+                                        <ul>
+                                            @if (dependency.DependsOn?.Count() > 0)
+                                            {
+                                                @foreach (var depends in dependency.DependsOn)
+                                                {
+                                                    if (!string.IsNullOrWhiteSpace(depends?.ToString()))
+                                                    {
+                                                        <li class="depends-on">@depends?.ToString()</li>
+                                                    }
+                                                }
+                                            }
+                                        </ul>
+                                    </details>
+                                }
+                            }
+                        </div>
+                    </div>
+                </ChildContent>
+            </FluentAccordionItem>
+
+        </FluentAccordion>
+    </FluentCard>
 }
-else
-{
-    <p>Loading...</p>
-}
 
-@code {
 
-    private Collapse? collapseGeneralInfo;
-    private Collapse? collapseMetadata;
-    private Collapse? collapseComponents;
-    private Collapse? collapseDependencies;
-    private Collapse? collapseDepends;
-    private Collapse? collapseMain;
-
-    private bool isExpanded;
-
-    [Parameter]
-    public CycloneDXDocument? Document { get; set; }
-
-    [Parameter]
-    public string? DocumentFileName { get; set; }
-
-    private string ChevronStyle => isExpanded ? "transform: rotate(180deg);" : "transform: rotate(0deg);";
-
-    private async Task ToggleAsync(Collapse? collapse)
-    {
-        if (collapse is not null)
-        {
-            await collapse.ToggleAsync();
-        }
-    }
-}
 
