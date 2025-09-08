@@ -1,4 +1,4 @@
-﻿using SBOMViewer.Blazor.Models.Spdx;
+using SBOMViewer.Blazor.Models.Spdx;
 using System.Reflection.Metadata;
 using System.Text.Json;
 using System.Text.Json.Serialization;
