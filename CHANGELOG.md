@@ -3,17 +3,27 @@
 ## [3.0.0] – Current
 
 ### New Features
+- **Dynamic rendering pipeline** — replaced all format-specific viewers (`CycloneDXViewer`, `SpdxViewer`), parsers (`CycloneDXParser`, `SpdxParser`), and typed models (`CycloneDXDocument`, `SpdxDocument`) with a JSON-driven UI. Three recursive components (`DynamicSbomViewer`, `DynamicSection`, `DynamicObject`) walk `JsonElement` + `SchemaNode` to render any SBOM format automatically.
+- **SchemaService** — infers a `SchemaNode` tree from uploaded JSON data in microseconds. No external schema files needed.
 - **CycloneDX 1.7 support** — lifecycles, component tags, OmniBOR IDs, SWHIDs, definitions/standards, declarations (assessors + claims), and formulation sections.
 - **Auto-detect format** — the viewer now automatically identifies the SBOM format and version from the uploaded JSON file. No manual format selector needed.
 - **Unsupported version handling** — uploading an unsupported version (e.g., CycloneDX 1.5, SPDX 2.3) shows a clear error message with the list of supported formats.
 - **Supported formats display** — the upload toolbar shows badges for all supported formats (CycloneDX 1.6, CycloneDX 1.7, SPDX 2.2).
 - **Sample SBOM files** — added `samples/` folder with ready-to-use CycloneDX 1.6, 1.7, and SPDX 2.2 test files.
+- **SEO** — added `robots.txt` and `sitemap.xml`.
 
 ### Improvements
+- Removed NJsonSchema dependency (too slow in WASM) — replaced with direct `JsonElement` traversal.
+- `SbomState` now holds `JsonDocument` + `SchemaNode` instead of typed models.
 - Removed the manual format selector dropdown for a simpler upload experience.
 - Cleaned up legacy duplicate upload handler in MainLayout.
 - New `SbomFormatDetector` service for lightweight JSON-based format detection.
-- CycloneDX viewer conditionally shows 1.7 sections only when data is present.
+
+### Removed
+- `CycloneDXViewer.razor`, `SpdxViewer.razor` (replaced by `DynamicSbomViewer`)
+- `CycloneDXParser.cs`, `SpdxParser.cs` (replaced by `JsonDocument.Parse`)
+- `CycloneDXDocument.cs`, `SpdxDocument.cs` (replaced by `JsonElement`)
+- `wwwroot/schemas/` directory and NJsonSchema package dependency
 
 ---
 

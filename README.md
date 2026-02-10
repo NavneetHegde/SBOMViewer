@@ -23,13 +23,15 @@ The format and version are **auto-detected** from the uploaded JSON file—no ma
 
 ## Latest Release
 
-**Version 3.0.0** – CycloneDX 1.7 support & auto-detect
+**Version 3.0.0** – Dynamic UI engine, CycloneDX 1.7 & auto-detect
 
+- **Dynamic rendering pipeline** — replaced hardcoded format-specific viewers and parsers with a JSON-driven UI that generates the display directly from the uploaded file structure
 - **CycloneDX 1.7** support with lifecycles, tags, OmniBOR IDs, SWHIDs, standards, declarations, and formulation
 - **Auto-detect format** — upload any supported SBOM JSON and the viewer identifies the format and version automatically
+- **Performance** — removed NJsonSchema dependency; schema inference now runs in microseconds via direct `JsonElement` traversal
+- **SEO** — added `robots.txt` and `sitemap.xml`
 - Unsupported versions show a clear error with the list of supported formats
 - Removed manual format selector dropdown for a simpler upload experience
-- Cleaned up legacy duplicate upload handler in MainLayout
 
 For the complete history of changes, see [CHANGELOG.md](./CHANGELOG.md).
 
@@ -81,7 +83,7 @@ The [`samples/`](./samples/) folder contains ready-to-use SBOM files for testing
 
 - **Blazor WebAssembly** — client-side UI, no backend required
 - **C# / .NET 10** — application logic and JSON parsing (`System.Text.Json`)
-- **Fluent UI** (`Microsoft.FluentUI.AspNetCore.Components` v4.12.0) — modern UI components
+- **Fluent UI** (`Microsoft.FluentUI.AspNetCore.Components` v4.13.2) — modern UI components
 - **Azure Static Web Apps** — hosting and deployment
 
 ## Project Structure
@@ -89,9 +91,9 @@ The [`samples/`](./samples/) folder contains ready-to-use SBOM files for testing
 ```
 SBOMViewer.sln
 ├── SBOMViewer.Blazor/          # Main Blazor WASM project
-│   ├── Components/             # UploadFile, SpdxViewer, CycloneDXViewer
-│   ├── Models/                 # SbomFormat, SpdxDocument, CycloneDXDocument
-│   ├── Services/               # Parsers, SbomState, SbomFormatDetector
+│   ├── Components/             # UploadFile, DynamicSbomViewer, DynamicSection, DynamicObject
+│   ├── Models/                 # SbomFormat, SchemaNode
+│   ├── Services/               # SchemaService, SbomState, SbomFormatDetector
 │   ├── Pages/                  # Home page
 │   └── Layout/                 # MainLayout (header, toolbar, footer)
 ├── SBOMViewer.Blazor.Tests/    # xUnit + FluentAssertions test suite

@@ -32,7 +32,9 @@ SBOMViewer.sln
 │   ├── azure-static-web-apps-sbomviewer.yml  # Build + deploy on push to main
 │   └── deploy-bicep.yml                      # Infrastructure deployment
 ├── docs/
-│   └── dynamic-ui-plan.md                  # Dynamic UI design document
+│   ├── dynamic-ui-plan.md                  # Dynamic UI design document
+│   └── testing-plan.md                     # Test coverage plan (47 tests)
+├── samples/                                # Sample SBOM JSON files for testing
 ├── SBOMViewer.Blazor.Tests/
 │   ├── TestData/
 │   │   └── TestJson.cs                     # Inline JSON test data for SPDX and CycloneDX
@@ -62,6 +64,8 @@ SBOMViewer.sln
     │   └── SchemaNode.cs                   # SchemaNode, SchemaNodeType, RenderHint
     └── wwwroot/
         ├── index.html                      # Host page (SEO meta, Google Analytics, Fluent theme loader)
+        ├── robots.txt                      # Search engine crawl rules
+        ├── sitemap.xml                     # Sitemap for SEO
         └── css/app.css                     # App styles
 ```
 
