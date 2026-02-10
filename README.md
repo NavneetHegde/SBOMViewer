@@ -5,7 +5,7 @@
 [**SBOM Viewer**](https://sbomviewer.com)
 
 <div align="center">
-  <img src="./sbomviewer_v2.jpeg" alt="SBOM Viewer Screenshot" width="600">
+  <img width="600" height="898" alt="image" src="https://github.com/user-attachments/assets/84849ad3-0a52-435e-bbf2-707f230c9ab6" />
 </div>
 
 SBOM Viewer is a web application built with Blazor WebAssembly that provides an interactive, user-friendly interface for viewing and exploring parsed SPDX and CycloneDX JSON files.
