@@ -1,5 +1,5 @@
-using SBOMViewer.Blazor.Models.CycloneDX;
-using SBOMViewer.Blazor.Models.Spdx;
+using System.Text.Json;
+using SBOMViewer.Blazor.Models;
 
 namespace SBOMViewer.Blazor.Services;
 
@@ -7,31 +7,31 @@ public class SbomState
 {
     public event Action? OnChange;
 
-    private CycloneDXDocument? _cycloneDXData;
-    public CycloneDXDocument? CycloneDXData
+    private JsonDocument? _document;
+    public JsonDocument? Document
     {
-        get => _cycloneDXData;
+        get => _document;
         set
         {
-            _cycloneDXData = value;
+            _document?.Dispose();
+            _document = value;
             NotifyStateChanged();
         }
     }
 
-    public string? CycloneDXFileName { get; set; }
+    public SchemaNode? Schema { get; set; }
+    public SbomFormat? DetectedFormat { get; set; }
+    public string? FileName { get; set; }
 
-    private SpdxDocument? _spdxData;
-    public SpdxDocument? SpdxData
+    public void Clear()
     {
-        get => _spdxData;
-        set
-        {
-            _spdxData = value;
-            NotifyStateChanged();
-        }
+        _document?.Dispose();
+        _document = null;
+        Schema = null;
+        DetectedFormat = null;
+        FileName = null;
+        NotifyStateChanged();
     }
 
-    public string? SpdxFileName { get; set; }
     private void NotifyStateChanged() => OnChange?.Invoke();
 }
-

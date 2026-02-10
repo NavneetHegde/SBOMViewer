@@ -1,0 +1,89 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:3e671687-395b-41f5-a30f-a58921a69b79",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2025-08-15T10:30:00Z",
+    "tools": [
+      {
+        "vendor": "CycloneDX",
+        "name": "cdxgen",
+        "version": "10.2.1"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "bom-ref": "app-root",
+      "name": "my-web-app",
+      "version": "2.1.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/express@4.18.2",
+      "name": "express",
+      "version": "4.18.2",
+      "description": "Fast, unopinionated, minimalist web framework",
+      "scope": "required",
+      "purl": "pkg:npm/express@4.18.2",
+      "licenses": [
+        { "license": { "id": "MIT" } }
+      ],
+      "externalReferences": [
+        { "type": "website", "url": "https://expressjs.com" },
+        { "type": "vcs", "url": "https://github.com/expressjs/express" }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/lodash@4.17.21",
+      "name": "lodash",
+      "version": "4.17.21",
+      "description": "Lodash modular utilities",
+      "scope": "required",
+      "purl": "pkg:npm/lodash@4.17.21",
+      "licenses": [
+        { "license": { "id": "MIT" } }
+      ],
+      "hashes": [
+        { "alg": "SHA-256", "content": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2" }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/axios@1.6.2",
+      "name": "axios",
+      "version": "1.6.2",
+      "description": "Promise based HTTP client for the browser and node.js",
+      "scope": "required",
+      "purl": "pkg:npm/axios@1.6.2",
+      "licenses": [
+        { "license": { "id": "MIT" } }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "app-root",
+      "dependsOn": [
+        "pkg:npm/express@4.18.2",
+        "pkg:npm/lodash@4.17.21",
+        "pkg:npm/axios@1.6.2"
+      ]
+    },
+    {
+      "ref": "pkg:npm/express@4.18.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/lodash@4.17.21",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/axios@1.6.2",
+      "dependsOn": []
+    }
+  ]
+}

@@ -450,3 +450,6 @@ publish/
 
 # Logs and temporary files
 *.log
+
+# Claude Code
+.claude/

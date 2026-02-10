@@ -1,0 +1,235 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.7",
+  "serialNumber": "urn:uuid:f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-01-10T09:15:00Z",
+    "tools": [
+      {
+        "vendor": "Anchore",
+        "name": "syft",
+        "version": "1.5.0"
+      }
+    ],
+    "lifecycles": [
+      { "phase": "build" },
+      { "phase": "post-build" },
+      { "phase": "operations" }
+    ],
+    "component": {
+      "type": "application",
+      "bom-ref": "payment-service",
+      "name": "payment-service",
+      "version": "4.0.0",
+      "description": "Secure payment processing microservice"
+    }
+  },
+  "components": [
+    {
+      "type": "framework",
+      "bom-ref": "pkg:nuget/Microsoft.AspNetCore.App@9.0.1",
+      "name": "Microsoft.AspNetCore.App",
+      "version": "9.0.1",
+      "description": "ASP.NET Core shared framework",
+      "scope": "required",
+      "purl": "pkg:nuget/Microsoft.AspNetCore.App@9.0.1",
+      "tags": ["framework", "microsoft", "web"],
+      "licenses": [
+        { "license": { "id": "MIT" } }
+      ],
+      "externalReferences": [
+        { "type": "website", "url": "https://dot.net" },
+        { "type": "vcs", "url": "https://github.com/dotnet/aspnetcore" }
+      ],
+      "hashes": [
+        { "alg": "SHA-256", "content": "4c3b2a19876543210fedcba0987654321abcdef0123456789abcdef01234567" }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/Stripe.net@45.3.0",
+      "name": "Stripe.net",
+      "version": "45.3.0",
+      "description": "Official Stripe API client library for .NET",
+      "scope": "required",
+      "purl": "pkg:nuget/Stripe.net@45.3.0",
+      "tags": ["payments", "stripe", "api-client"],
+      "omniborId": ["gitoid:blob:sha256:a1b2c3d4e5f67890abcdef1234567890abcdef12"],
+      "swhid": ["swh:1:cnt:94a9ed024d3859793618152ea559a168bbcbb5e2"],
+      "authors": [
+        { "name": "Stripe" }
+      ],
+      "licenses": [
+        { "license": { "id": "Apache-2.0", "url": "https://github.com/stripe/stripe-dotnet/blob/master/LICENSE" } }
+      ],
+      "externalReferences": [
+        { "type": "website", "url": "https://stripe.com/docs/api" },
+        { "type": "vcs", "url": "https://github.com/stripe/stripe-dotnet" }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/System.Security.Cryptography.Algorithms@4.3.1",
+      "name": "System.Security.Cryptography.Algorithms",
+      "version": "4.3.1",
+      "description": "Provides implementations of cryptographic algorithms",
+      "scope": "required",
+      "purl": "pkg:nuget/System.Security.Cryptography.Algorithms@4.3.1",
+      "tags": ["security", "cryptography", "dotnet"],
+      "licenses": [
+        { "license": { "id": "MIT" } }
+      ],
+      "hashes": [
+        { "alg": "SHA-256", "content": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/Npgsql@9.0.2",
+      "name": "Npgsql",
+      "version": "9.0.2",
+      "description": "PostgreSQL database driver for .NET",
+      "scope": "required",
+      "purl": "pkg:nuget/Npgsql@9.0.2",
+      "tags": ["database", "postgresql"],
+      "omniborId": ["gitoid:blob:sha256:deadbeefcafe1234567890abcdef1234567890ab"],
+      "authors": [
+        { "name": "Shay Rojansky" }
+      ],
+      "licenses": [
+        { "license": { "name": "PostgreSQL License" } }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/Serilog.AspNetCore@8.0.1",
+      "name": "Serilog.AspNetCore",
+      "version": "8.0.1",
+      "description": "Serilog integration for ASP.NET Core",
+      "scope": "required",
+      "purl": "pkg:nuget/Serilog.AspNetCore@8.0.1",
+      "tags": ["logging", "observability"],
+      "licenses": [
+        { "license": { "id": "Apache-2.0" } }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/MassTransit@8.2.3",
+      "name": "MassTransit",
+      "version": "8.2.3",
+      "description": "Distributed application framework for .NET",
+      "scope": "required",
+      "purl": "pkg:nuget/MassTransit@8.2.3",
+      "tags": ["messaging", "rabbitmq", "event-driven"],
+      "licenses": [
+        { "license": { "id": "Apache-2.0" } }
+      ],
+      "externalReferences": [
+        { "type": "documentation", "url": "https://masstransit.io/documentation" },
+        { "type": "vcs", "url": "https://github.com/MassTransit/MassTransit" }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "payment-service",
+      "dependsOn": [
+        "pkg:nuget/Microsoft.AspNetCore.App@9.0.1",
+        "pkg:nuget/Stripe.net@45.3.0",
+        "pkg:nuget/System.Security.Cryptography.Algorithms@4.3.1",
+        "pkg:nuget/Npgsql@9.0.2",
+        "pkg:nuget/Serilog.AspNetCore@8.0.1",
+        "pkg:nuget/MassTransit@8.2.3"
+      ]
+    },
+    {
+      "ref": "pkg:nuget/Stripe.net@45.3.0",
+      "dependsOn": [
+        "pkg:nuget/System.Security.Cryptography.Algorithms@4.3.1"
+      ]
+    },
+    {
+      "ref": "pkg:nuget/Microsoft.AspNetCore.App@9.0.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:nuget/System.Security.Cryptography.Algorithms@4.3.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:nuget/Npgsql@9.0.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:nuget/Serilog.AspNetCore@8.0.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:nuget/MassTransit@8.2.3",
+      "dependsOn": []
+    }
+  ],
+  "definitions": {
+    "standards": [
+      {
+        "bom-ref": "std-pci-dss",
+        "name": "PCI DSS",
+        "version": "4.0",
+        "description": "Payment Card Industry Data Security Standard — requirements for secure handling of cardholder data"
+      },
+      {
+        "bom-ref": "std-owasp-top10",
+        "name": "OWASP Top 10",
+        "version": "2021",
+        "description": "Top 10 web application security risks"
+      },
+      {
+        "bom-ref": "std-nist-csf",
+        "name": "NIST Cybersecurity Framework",
+        "version": "2.0",
+        "description": "Framework for improving critical infrastructure cybersecurity"
+      }
+    ]
+  },
+  "declarations": {
+    "assessors": [
+      {
+        "bom-ref": "assessor-secteam",
+        "organization": { "name": "Internal Security Team" }
+      },
+      {
+        "bom-ref": "assessor-external",
+        "organization": { "name": "TrustWave Security Auditors" }
+      }
+    ],
+    "claims": [
+      {
+        "bom-ref": "claim-pci-compliance",
+        "target": "payment-service",
+        "predicate": "Compliant with PCI DSS v4.0 — validated by external audit Q4 2025"
+      },
+      {
+        "bom-ref": "claim-crypto-review",
+        "target": "pkg:nuget/System.Security.Cryptography.Algorithms@4.3.1",
+        "predicate": "Cryptographic algorithms reviewed — no deprecated ciphers in use"
+      },
+      {
+        "bom-ref": "claim-owasp-scan",
+        "target": "payment-service",
+        "predicate": "OWASP Top 10 scan passed — no critical or high findings"
+      }
+    ]
+  },
+  "formulation": [
+    {
+      "bom-ref": "formula-ci-build",
+      "components": [
+        { "type": "application", "name": "dotnet-sdk", "version": "9.0.101" },
+        { "type": "application", "name": "docker", "version": "25.0.3" },
+        { "type": "application", "name": "github-actions-runner", "version": "2.311.0" }
+      ]
+    }
+  ]
+}

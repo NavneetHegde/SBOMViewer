@@ -1,0 +1,31 @@
+# Build artifacts
+[Bb]in/
+[Oo]bj/
+publish/
+publish_output/
+
+# Visual Studio
+.vs/
+
+# IDE files
+.idea/
+.vscode/
+*.user
+*.suo
+
+# Images
+*.jpeg
+*.png
+*.ico
+
+# NuGet
+**/[Pp]ackages/
+
+# Git
+.git/
+
+# Blazor WASM build output
+wwwroot/_framework/
+wwwroot/*.pdb
+wwwroot/*.js.map
+wwwroot/*.wasm

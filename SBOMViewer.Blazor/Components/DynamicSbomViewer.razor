@@ -1,0 +1,190 @@
+@using System.Text.Json
+@using Microsoft.FluentUI.AspNetCore.Components
+@using SBOMViewer.Blazor.Models
+
+@if (RootElement.ValueKind == JsonValueKind.Object)
+{
+    <FluentCard Style="background-color:var(--neutral-layer1); color:var(--neutral-foreground-rest); padding:1rem;">
+        <!-- Document Filename Centered -->
+        <div style="display:flex; align-items:center; justify-content:center; gap:0.5rem; margin-bottom:1rem;">
+            <FluentIcon Value="@(new Icons.Regular.Size24.DocumentTextExtract())" />
+            <span style="font-weight:bold; font-size:1.1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
+                  title="@FileName">
+                @FileName
+            </span>
+        </div>
+
+        <FluentAccordion>
+            @{
+                // Group 1: Scalar top-level properties → "General Information" accordion
+                var scalarProps = GetPresentProperties(SchemaNodeType.String, SchemaNodeType.Integer,
+                    SchemaNodeType.Number, SchemaNodeType.Boolean);
+
+                if (scalarProps.Count > 0)
+                {
+                    <FluentAccordionItem Expanded="true">
+                        <HeadingTemplate>
+                            <div style="display:flex; align-items:center; gap:0.5rem;">
+                                <FluentIcon Value="@(new Icons.Regular.Size24.Info())" />
+                                <span>General Information</span>
+                            </div>
+                        </HeadingTemplate>
+                        <ChildContent>
+                            <div class="info-container">
+                                @foreach (var propName in scalarProps)
+                                {
+                                    if (RootElement.TryGetProperty(propName, out var val))
+                                    {
+                                        var schemaProp = Schema.Properties.GetValueOrDefault(propName);
+                                        <div><strong>@(schemaProp?.Title ?? HumanizePropertyName(propName)):</strong> @FormatScalar(val)</div>
+                                    }
+                                }
+                            </div>
+                        </ChildContent>
+                    </FluentAccordionItem>
+                    <FluentDivider />
+                }
+
+                // Group 2: Object/Array properties → individual accordion sections
+                var complexProps = GetPresentProperties(SchemaNodeType.Object, SchemaNodeType.Array);
+
+                foreach (var propName in complexProps)
+                {
+                    if (!RootElement.TryGetProperty(propName, out var val)) continue;
+                    var schemaProp = Schema.Properties.GetValueOrDefault(propName);
+                    var title = schemaProp?.Title ?? HumanizePropertyName(propName);
+                    var isFirstComplex = propName == complexProps.First();
+
+                    <FluentAccordionItem Expanded="@isFirstComplex">
+                        <HeadingTemplate>
+                            <div style="display:flex; align-items:center; gap:0.5rem;">
+                                <FluentIcon Value="@GetSectionIcon(propName)" />
+                                <span>@title @GetItemCount(val)</span>
+                            </div>
+                        </HeadingTemplate>
+                        <ChildContent>
+                            <DynamicSection Element="@val" Schema="@schemaProp" PropertyName="@propName" />
+                        </ChildContent>
+                    </FluentAccordionItem>
+                    <FluentDivider />
+                }
+
+                // Group 3: Properties present in JSON but NOT in schema (unknown properties)
+                foreach (var prop in RootElement.EnumerateObject())
+                {
+                    if (Schema.Properties.ContainsKey(prop.Name) || prop.Name == "$schema")
+                        continue;
+
+                    // Skip scalar unknowns that were already captured in General Info via JSON traversal
+                    if (prop.Value.ValueKind is JsonValueKind.String or JsonValueKind.Number
+                        or JsonValueKind.True or JsonValueKind.False)
+                    {
+                        // Show as a bonus entry in General Information if not already there
+                        continue;
+                    }
+
+                    <FluentAccordionItem>
+                        <HeadingTemplate>
+                            <div style="display:flex; align-items:center; gap:0.5rem;">
+                                <FluentIcon Value="@(new Icons.Regular.Size24.List())" />
+                                <span>@HumanizePropertyName(prop.Name) @GetItemCount(prop.Value)</span>
+                            </div>
+                        </HeadingTemplate>
+                        <ChildContent>
+                            <DynamicSection Element="@prop.Value" Schema="@null" PropertyName="@prop.Name" />
+                        </ChildContent>
+                    </FluentAccordionItem>
+                    <FluentDivider />
+                }
+            }
+        </FluentAccordion>
+    </FluentCard>
+}
+
+@code {
+    [Parameter] public JsonElement RootElement { get; set; }
+    [Parameter] public SchemaNode Schema { get; set; } = default!;
+    [Parameter] public string? FileName { get; set; }
+
+    /// <summary>
+    /// Returns schema-ordered property names that exist in the JSON and match the given node types.
+    /// Also includes non-schema scalar properties for the General Information section.
+    /// </summary>
+    private List<string> GetPresentProperties(params SchemaNodeType[] types)
+    {
+        var typeSet = new HashSet<SchemaNodeType>(types);
+        var result = new List<string>();
+
+        // Schema-ordered properties first
+        foreach (var propName in Schema.PropertyOrder)
+        {
+            if (!Schema.Properties.TryGetValue(propName, out var schemaProp)) continue;
+            if (!typeSet.Contains(schemaProp.NodeType)) continue;
+            if (!RootElement.TryGetProperty(propName, out _)) continue;
+            result.Add(propName);
+        }
+
+        // For scalars, also include non-schema properties present in JSON
+        if (typeSet.Contains(SchemaNodeType.String) || typeSet.Contains(SchemaNodeType.Integer)
+            || typeSet.Contains(SchemaNodeType.Number) || typeSet.Contains(SchemaNodeType.Boolean))
+        {
+            foreach (var prop in RootElement.EnumerateObject())
+            {
+                if (result.Contains(prop.Name) || Schema.Properties.ContainsKey(prop.Name))
+                    continue;
+                if (prop.Name == "$schema") continue;
+                if (prop.Value.ValueKind is JsonValueKind.String or JsonValueKind.Number
+                    or JsonValueKind.True or JsonValueKind.False)
+                {
+                    result.Add(prop.Name);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static string FormatScalar(JsonElement el) => el.ValueKind switch
+    {
+        JsonValueKind.String => el.GetString() ?? "",
+        JsonValueKind.Number => el.GetRawText(),
+        JsonValueKind.True => "true",
+        JsonValueKind.False => "false",
+        JsonValueKind.Null => "(null)",
+        _ => el.GetRawText()
+    };
+
+    private static string GetItemCount(JsonElement el) => el.ValueKind switch
+    {
+        JsonValueKind.Array => $"| {el.GetArrayLength()}",
+        _ => ""
+    };
+
+    private static string HumanizePropertyName(string name)
+    {
+        var result = System.Text.RegularExpressions.Regex.Replace(name, "([a-z])([A-Z])", "$1 $2");
+        result = result.Replace("-", " ").Replace("_", " ");
+        return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(result);
+    }
+
+    private static Icon GetSectionIcon(string propName) => propName.ToLowerInvariant() switch
+    {
+        "metadata" or "creationinfo" => new Icons.Regular.Size24.Tab(),
+        "components" => new Icons.Regular.Size24.Layer(),
+        "services" => new Icons.Regular.Size24.Cloud(),
+        "externalreferences" or "externalrefs" => new Icons.Regular.Size24.Globe(),
+        "dependencies" or "relationships" => new Icons.Regular.Size24.Link(),
+        "compositions" => new Icons.Regular.Size24.Grid(),
+        "vulnerabilities" => new Icons.Regular.Size24.ShieldError(),
+        "annotations" => new Icons.Regular.Size24.Comment(),
+        "formulation" => new Icons.Regular.Size24.Beaker(),
+        "declarations" => new Icons.Regular.Size24.Shield(),
+        "definitions" or "standards" => new Icons.Regular.Size24.BookOpen(),
+        "citations" => new Icons.Regular.Size24.Trophy(),
+        "properties" => new Icons.Regular.Size24.MailList(),
+        "signature" => new Icons.Regular.Size24.Signature(),
+        "packages" => new Icons.Regular.Size24.Box(),
+        "files" => new Icons.Regular.Size24.Document(),
+        _ => new Icons.Regular.Size24.List()
+    };
+}
