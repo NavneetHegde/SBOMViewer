@@ -52,15 +52,31 @@
                 </HeadingTemplate>
                 <ChildContent>
                     <div>
-                        <div><strong>Timestamp:</strong> @Document.Metadata.Timestamp</div>
+                        <div><strong>Timestamp:</strong> @Document.Metadata?.Timestamp</div>
 
-                        <div><strong>Tools:</strong></div>
-                        <ul>
-                            @foreach (var tool in Document.Metadata.Tools)
-                            {
-                                <li>@tool.Name (@tool.Vendor) - @tool.Version</li>
-                            }
-                        </ul>
+                        @if (Document.Metadata?.Tools?.Count > 0)
+                        {
+                            <div><strong>Tools:</strong></div>
+                            <ul>
+                                @foreach (var tool in Document.Metadata.Tools)
+                                {
+                                    <li>@tool.Name (@tool.Vendor) - @tool.Version</li>
+                                }
+                            </ul>
+                        }
+
+                        @if (Document.Metadata?.Lifecycles?.Count > 0)
+                        {
+                            <div><strong>Lifecycles:</strong></div>
+                            <div style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.3rem;">
+                                @foreach (var lifecycle in Document.Metadata.Lifecycles)
+                                {
+                                    <FluentBadge Appearance="Appearance.Accent">
+                                        @(lifecycle.Phase ?? lifecycle.Description ?? "unknown")
+                                    </FluentBadge>
+                                }
+                            </div>
+                        }
                     </div>
                 </ChildContent>
             </FluentAccordionItem>
@@ -94,6 +110,38 @@
                                     <div><span><strong>Bom-ref :</strong> @component.BomRef</span></div>
                                     <div><span><strong>Copyright:</strong> @component.Copyright</span></div>
                                     <div><span><strong>Purl:</strong> @component.Purl</span></div>
+                                    @if (component.Tags?.Count > 0)
+                                    {
+                                        <div style="margin-top:0.3rem;">
+                                            <strong>Tags:</strong>
+                                            <span style="display:inline-flex; flex-wrap:wrap; gap:0.3rem; margin-left:0.3rem;">
+                                                @foreach (var tag in component.Tags)
+                                                {
+                                                    <FluentBadge Appearance="Appearance.Neutral">@tag</FluentBadge>
+                                                }
+                                            </span>
+                                        </div>
+                                    }
+                                    @if (component.OmniborId?.Count > 0)
+                                    {
+                                        <div><span><strong>OmniBOR ID:</strong></span></div>
+                                        <ul>
+                                            @foreach (var id in component.OmniborId)
+                                            {
+                                                <li>@id</li>
+                                            }
+                                        </ul>
+                                    }
+                                    @if (component.Swhid?.Count > 0)
+                                    {
+                                        <div><span><strong>SWHID:</strong></span></div>
+                                        <ul>
+                                            @foreach (var id in component.Swhid)
+                                            {
+                                                <li>@id</li>
+                                            }
+                                        </ul>
+                                    }
                                     <div><span><strong>Authors</strong></span></div>
                                     <ul>
                                         @if (component.Authors != null)
@@ -180,9 +228,120 @@
                 </ChildContent>
             </FluentAccordionItem>
 
+            @if (Document.Definitions?.Standards?.Count > 0)
+            {
+                <FluentDivider />
+
+                <!-- Definitions / Standards -->
+                <FluentAccordionItem>
+                    <HeadingTemplate>
+                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <FluentIcon Value="@(new Icons.Regular.Size24.BookOpen())" />
+                            <span>Standards | @Document.Definitions.Standards.Count</span>
+                        </div>
+                    </HeadingTemplate>
+                    <ChildContent>
+                        <div class="scroll-container" style="max-height:400px; overflow-y:auto; padding-right:0.5rem;">
+                            @foreach (var standard in Document.Definitions.Standards)
+                            {
+                                <details>
+                                    <summary>@standard.Name @(!string.IsNullOrWhiteSpace(standard.Version) ? $"(v{standard.Version})" : "")</summary>
+                                    @if (!string.IsNullOrWhiteSpace(standard.Description))
+                                    {
+                                        <div><span><strong>Description:</strong> @standard.Description</span></div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(standard.BomRef))
+                                    {
+                                        <div><span><strong>Bom-ref:</strong> @standard.BomRef</span></div>
+                                    }
+                                </details>
+                            }
+                        </div>
+                    </ChildContent>
+                </FluentAccordionItem>
+            }
+
+            @if (Document.Declarations?.Claims?.Count > 0 || Document.Declarations?.Assessors?.Count > 0)
+            {
+                <FluentDivider />
+
+                <!-- Declarations -->
+                <FluentAccordionItem>
+                    <HeadingTemplate>
+                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <FluentIcon Value="@(new Icons.Regular.Size24.Shield())" />
+                            <span>Declarations</span>
+                        </div>
+                    </HeadingTemplate>
+                    <ChildContent>
+                        <div class="scroll-container" style="max-height:400px; overflow-y:auto; padding-right:0.5rem;">
+                            @if (Document.Declarations.Assessors?.Count > 0)
+                            {
+                                <div><strong>Assessors:</strong></div>
+                                <ul>
+                                    @foreach (var assessor in Document.Declarations.Assessors)
+                                    {
+                                        <li>@(assessor.Organization?.Name ?? assessor.BomRef ?? "unknown")</li>
+                                    }
+                                </ul>
+                            }
+                            @if (Document.Declarations.Claims?.Count > 0)
+                            {
+                                <div><strong>Claims:</strong></div>
+                                @foreach (var claim in Document.Declarations.Claims)
+                                {
+                                    <details>
+                                        <summary>@(claim.BomRef ?? "claim")</summary>
+                                        @if (!string.IsNullOrWhiteSpace(claim.Target))
+                                        {
+                                            <div><span><strong>Target:</strong> @claim.Target</span></div>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(claim.Predicate))
+                                        {
+                                            <div><span><strong>Predicate:</strong> @claim.Predicate</span></div>
+                                        }
+                                    </details>
+                                }
+                            }
+                        </div>
+                    </ChildContent>
+                </FluentAccordionItem>
+            }
+
+            @if (Document.Formulation?.Count > 0)
+            {
+                <FluentDivider />
+
+                <!-- Formulation -->
+                <FluentAccordionItem>
+                    <HeadingTemplate>
+                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <FluentIcon Value="@(new Icons.Regular.Size24.Beaker())" />
+                            <span>Formulation | @Document.Formulation.Count</span>
+                        </div>
+                    </HeadingTemplate>
+                    <ChildContent>
+                        <div class="scroll-container" style="max-height:400px; overflow-y:auto; padding-right:0.5rem;">
+                            @foreach (var formula in Document.Formulation)
+                            {
+                                <details>
+                                    <summary>@(formula.BomRef ?? "formula") @(formula.Components?.Count > 0 ? $"| {formula.Components.Count} components" : "")</summary>
+                                    @if (formula.Components?.Count > 0)
+                                    {
+                                        <ul>
+                                            @foreach (var comp in formula.Components)
+                                            {
+                                                <li>@comp.Name @(!string.IsNullOrWhiteSpace(comp.Version) ? $"({comp.Version})" : "")</li>
+                                            }
+                                        </ul>
+                                    }
+                                </details>
+                            }
+                        </div>
+                    </ChildContent>
+                </FluentAccordionItem>
+            }
+
         </FluentAccordion>
     </FluentCard>
 }
-
-
-

@@ -50,50 +50,9 @@
 
         <!-- Footer -->
         <FluentFooter Style="padding:0.5rem; display:flex; justify-content:center; align-items:center; font-size:0.85rem; color:var(--neutral-foreground-2); border-top:1px solid var(--neutral-stroke-1); flex-shrink:0;">
-            © 2025. Licensed under the MIT License. SBOM Viewer v2.0.1
+            © 2025. Licensed under the MIT License. SBOM Viewer v3.0
         </FluentFooter>
 
     </FluentLayout>
 </div>
 
-@code {
-
-    private SbomFormat SelectedSbomFormat = SbomFormat.CycloneDX_1_6;
-
-    private string SelectedSbomFormatString
-    {
-        get => SelectedSbomFormat.ToString();
-        set
-        {
-            if (Enum.TryParse<SbomFormat>(value, out var result))
-            {
-                SelectedSbomFormat = result;
-            }
-        }
-    }
-
-    async Task OnCompleted(IEnumerable<FluentInputFileEventArgs> files)
-    {
-        foreach (var file in files)
-        {
-            if (file?.Stream is null)
-                continue;
-
-            using var reader = new StreamReader(file.Stream);
-            string content = await reader.ReadToEndAsync();
-
-            if (SelectedSbomFormat == SbomFormat.SPDX_2_2)
-            {
-                SbomState.SpdxData = SpdxParser.ParseSpdxJsonAsync(content).Result;
-                SbomState.SpdxFileName = file.Name;
-            }
-            else if (SelectedSbomFormat == SbomFormat.CycloneDX_1_6)
-            {
-                SbomState.CycloneDXData = CycloneDXParser.ParseCycloneDXBomJsonAsyncParseJson(content).Result;
-                SbomState.CycloneDXFileName = file.Name;
-            }
-        }
-
-        StateHasChanged(); // refresh MainLayout + pages
-    }
-}

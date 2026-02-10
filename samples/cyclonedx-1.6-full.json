@@ -1,0 +1,213 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:b1a2c3d4-e5f6-7890-abcd-ef1234567890",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2025-11-20T14:45:00Z",
+    "tools": [
+      {
+        "vendor": "Microsoft",
+        "name": "sbom-tool",
+        "version": "2.2.5"
+      },
+      {
+        "vendor": "Anchore",
+        "name": "syft",
+        "version": "0.100.0"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "bom-ref": "ecommerce-api",
+      "name": "ecommerce-api",
+      "version": "5.3.1",
+      "description": "E-commerce REST API backend service"
+    }
+  },
+  "components": [
+    {
+      "type": "framework",
+      "bom-ref": "pkg:nuget/Microsoft.AspNetCore.App@8.0.10",
+      "name": "Microsoft.AspNetCore.App",
+      "version": "8.0.10",
+      "description": "ASP.NET Core shared framework",
+      "scope": "required",
+      "purl": "pkg:nuget/Microsoft.AspNetCore.App@8.0.10",
+      "authors": [
+        { "name": "Microsoft" }
+      ],
+      "licenses": [
+        { "license": { "id": "MIT", "url": "https://licenses.nuget.org/MIT" } }
+      ],
+      "externalReferences": [
+        { "type": "website", "url": "https://dot.net" },
+        { "type": "vcs", "url": "https://github.com/dotnet/aspnetcore" }
+      ],
+      "hashes": [
+        { "alg": "SHA-256", "content": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08" }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/Newtonsoft.Json@13.0.3",
+      "name": "Newtonsoft.Json",
+      "version": "13.0.3",
+      "description": "Popular high-performance JSON framework for .NET",
+      "scope": "required",
+      "purl": "pkg:nuget/Newtonsoft.Json@13.0.3",
+      "authors": [
+        { "name": "James Newton-King" }
+      ],
+      "licenses": [
+        { "license": { "id": "MIT" } }
+      ],
+      "copyright": "Copyright (c) 2007 James Newton-King",
+      "hashes": [
+        { "alg": "SHA-256", "content": "e7f7d075e3d2c0e3eb3e65a60729a3e4cfbf7b1dfb7e93827bfe5a7f0a57e6c9" },
+        { "alg": "SHA-1", "content": "0a3f5e6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f" }
+      ],
+      "externalReferences": [
+        { "type": "website", "url": "https://www.newtonsoft.com/json" },
+        { "type": "vcs", "url": "https://github.com/JamesNK/Newtonsoft.Json" }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/Serilog@3.1.1",
+      "name": "Serilog",
+      "version": "3.1.1",
+      "description": "Simple .NET logging with fully-structured events",
+      "scope": "required",
+      "purl": "pkg:nuget/Serilog@3.1.1",
+      "authors": [
+        { "name": "Serilog Contributors" }
+      ],
+      "licenses": [
+        { "license": { "id": "Apache-2.0" } }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/Npgsql@8.0.1",
+      "name": "Npgsql",
+      "version": "8.0.1",
+      "description": "PostgreSQL database driver for .NET",
+      "scope": "required",
+      "purl": "pkg:nuget/Npgsql@8.0.1",
+      "authors": [
+        { "name": "Shay Rojansky" },
+        { "name": "Npgsql Contributors" }
+      ],
+      "licenses": [
+        { "license": { "name": "PostgreSQL License", "url": "https://opensource.org/licenses/PostgreSQL" } }
+      ],
+      "externalReferences": [
+        { "type": "documentation", "url": "https://www.npgsql.org/doc/index.html" }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/StackExchange.Redis@2.7.10",
+      "name": "StackExchange.Redis",
+      "version": "2.7.10",
+      "description": "High performance Redis client",
+      "scope": "optional",
+      "purl": "pkg:nuget/StackExchange.Redis@2.7.10",
+      "licenses": [
+        { "license": { "id": "MIT" } }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/FluentValidation@11.9.0",
+      "name": "FluentValidation",
+      "version": "11.9.0",
+      "description": "A validation library for .NET that uses a fluent interface",
+      "scope": "required",
+      "purl": "pkg:nuget/FluentValidation@11.9.0",
+      "licenses": [
+        { "license": { "id": "Apache-2.0" } }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/MediatR@12.2.0",
+      "name": "MediatR",
+      "version": "12.2.0",
+      "description": "Simple mediator implementation in .NET",
+      "scope": "required",
+      "purl": "pkg:nuget/MediatR@12.2.0",
+      "authors": [
+        { "name": "Jimmy Bogard" }
+      ],
+      "licenses": [
+        { "license": { "id": "Apache-2.0" } }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/Polly@8.2.0",
+      "name": "Polly",
+      "version": "8.2.0",
+      "description": "Resilience and transient-fault-handling library for .NET",
+      "scope": "required",
+      "purl": "pkg:nuget/Polly@8.2.0",
+      "licenses": [
+        { "license": { "id": "BSD-3-Clause" } }
+      ],
+      "externalReferences": [
+        { "type": "vcs", "url": "https://github.com/App-vNext/Polly" }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "ecommerce-api",
+      "dependsOn": [
+        "pkg:nuget/Microsoft.AspNetCore.App@8.0.10",
+        "pkg:nuget/Newtonsoft.Json@13.0.3",
+        "pkg:nuget/Serilog@3.1.1",
+        "pkg:nuget/Npgsql@8.0.1",
+        "pkg:nuget/StackExchange.Redis@2.7.10",
+        "pkg:nuget/FluentValidation@11.9.0",
+        "pkg:nuget/MediatR@12.2.0",
+        "pkg:nuget/Polly@8.2.0"
+      ]
+    },
+    {
+      "ref": "pkg:nuget/Microsoft.AspNetCore.App@8.0.10",
+      "dependsOn": [
+        "pkg:nuget/Newtonsoft.Json@13.0.3"
+      ]
+    },
+    {
+      "ref": "pkg:nuget/Newtonsoft.Json@13.0.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:nuget/Serilog@3.1.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:nuget/Npgsql@8.0.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:nuget/StackExchange.Redis@2.7.10",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:nuget/FluentValidation@11.9.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:nuget/MediatR@12.2.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:nuget/Polly@8.2.0",
+      "dependsOn": []
+    }
+  ]
+}

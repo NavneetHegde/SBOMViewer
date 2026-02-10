@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 
 namespace SBOMViewer.Blazor.Models.Spdx;
 
@@ -98,19 +98,19 @@ public class SpdxPackage
     public bool? FilesAnalyzed { get; set; }
 
     [JsonPropertyName("externalRefs")]
-    public List<ExternalReference> ExternalReferences { get; set; }
+    public List<ExternalReference> ExternalReferences { get; set; } = new();
 }
 
 public class ExternalReference
 {
     [JsonPropertyName("referenceCategory")]
-    public string ReferenceCategory { get; set; }
+    public string? ReferenceCategory { get; set; }
 
     [JsonPropertyName("referenceType")]
-    public string ReferenceType { get; set; }
+    public string? ReferenceType { get; set; }
 
     [JsonPropertyName("referenceLocator")]
-    public string ReferenceLocator { get; set; }
+    public string? ReferenceLocator { get; set; }
 }
 
 public class SpdxRelationship

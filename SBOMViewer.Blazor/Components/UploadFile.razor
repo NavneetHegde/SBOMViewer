@@ -1,29 +1,40 @@
 @inject SbomState SbomState
 
 <!-- Container -->
-<FluentStack Orientation="Orientation.Horizontal" HorizontalAlignment="HorizontalAlignment.Center" Style="max-width:800px; margin:auto; padding:1rem; gap:1rem;">
+<FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center" Style="max-width:800px; margin:auto; padding:1rem; gap:0.5rem;">
 
-    <!-- Format Selection -->
-    <FluentSelect TOption="SbomFormat" @bind-Value="SelectedSbomFormatString" Appearance="Appearance.Stealth" Style="width:300px;">
-        @foreach (var format in Enum.GetValues<SbomFormat>())
+    <FluentStack Orientation="Orientation.Horizontal" HorizontalAlignment="HorizontalAlignment.Center" Style="gap:1rem;">
+        <!-- File Upload -->
+        <FluentInputFile AnchorId="MyUploadStream"
+                         DragDropZoneVisible="false"
+                         Mode="InputFileMode.Stream"
+                         Multiple="false"
+                         MaximumFileSize="@(20 * 1024 * 1024)"
+                         Accept=".json"
+                         OnCompleted="@OnCompleted" />
+
+        <FluentButton Appearance="Appearance.Accent" Id="MyUploadStream">
+            Upload SBOM
+        </FluentButton>
+    </FluentStack>
+
+    <!-- Supported formats -->
+    <div style="display:flex; justify-content:center; gap:0.4rem; flex-wrap:wrap;">
+        <span style="font-size:0.8rem; color:var(--neutral-foreground-hint);">Supported:</span>
+        @foreach (var version in SbomFormatDetector.SupportedVersions)
         {
-            <FluentOption Value="@format.ToString()">@format</FluentOption>
+            <FluentBadge Appearance="Appearance.Neutral" Style="font-size:0.75rem;">@version</FluentBadge>
         }
-    </FluentSelect>
-
-    <!-- File Upload -->
-    <FluentInputFile AnchorId="MyUploadStream"
-                     DragDropZoneVisible="false"
-                     Mode="InputFileMode.Stream"
-                     Multiple="false"
-                     MaximumFileSize="@(20 * 1024 * 1024)"
-                     Accept=".json"
-                     OnCompleted="@OnCompleted" />
-
-    <FluentButton Appearance="Appearance.Accent" Id="MyUploadStream">
-        Upload files
-    </FluentButton>
+    </div>
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div style="text-align:center; padding:0.5rem;">
+            <FluentBadge Appearance="Appearance.Lightweight" Color="Color.Error">@errorMessage</FluentBadge>
+        </div>
+    }
 </FluentStack>
+
+
 @if (isLoading)
 {
     <div style="
@@ -39,18 +50,17 @@
     </div>
 }
 
-
-
 @code {
 
-    string? fileContent;
     private bool isLoading = false;
+    private string? errorMessage;
 
     async Task OnCompleted(IEnumerable<FluentInputFileEventArgs> files)
     {
         if (files == null || !files.Any()) return;
 
         isLoading = true;
+        errorMessage = null;
         StateHasChanged();
 
         foreach (var file in files)
@@ -60,7 +70,19 @@
             using var reader = new StreamReader(file.Stream);
             string content = await reader.ReadToEndAsync();
 
-            if (SelectedSbomFormat == SbomFormat.SPDX_2_2)
+            var result = SbomFormatDetector.DetectWithDetails(content);
+
+            if (result.IsUnsupportedVersion)
+            {
+                errorMessage = $"Version \"{result.DetectedVersion}\" is not supported. Supported versions: {string.Join(", ", SbomFormatDetector.SupportedVersions)}.";
+                ClearState();
+            }
+            else if (result.Format == null)
+            {
+                errorMessage = "Unrecognized SBOM format. Please upload a valid CycloneDX or SPDX JSON file.";
+                ClearState();
+            }
+            else if (result.Format == SbomFormat.SPDX_2_2)
             {
                 SbomState.SpdxData = SpdxParser.ParseSpdxJsonAsync(content).Result;
                 SbomState.SpdxFileName = file.Name;
@@ -69,8 +91,9 @@
                 SbomState.CycloneDXData = null;
                 SbomState.CycloneDXFileName = null;
             }
-            else if (SelectedSbomFormat == SbomFormat.CycloneDX_1_6)
+            else
             {
+                // CycloneDX 1.6 or 1.7 — same parser handles both
                 SbomState.CycloneDXData = CycloneDXParser.ParseCycloneDXBomJsonAsyncParseJson(content).Result;
                 SbomState.CycloneDXFileName = file.Name;
 
@@ -84,21 +107,11 @@
         StateHasChanged();
     }
 
-
-
-    // The actual enum value
-    private SbomFormat SelectedSbomFormat = SbomFormat.CycloneDX_1_6;
-
-    // The string bound to the FluentSelect
-    private string SelectedSbomFormatString
+    private void ClearState()
     {
-        get => SelectedSbomFormat.ToString();
-        set
-        {
-            if (Enum.TryParse<SbomFormat>(value, out var result))
-            {
-                SelectedSbomFormat = result;
-            }
-        }
+        SbomState.CycloneDXData = null;
+        SbomState.CycloneDXFileName = null;
+        SbomState.SpdxData = null;
+        SbomState.SpdxFileName = null;
     }
 }

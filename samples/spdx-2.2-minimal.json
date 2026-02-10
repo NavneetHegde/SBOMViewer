@@ -1,0 +1,65 @@
+{
+  "spdxVersion": "SPDX-2.2",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "hello-world-app",
+  "documentNamespace": "https://example.org/sbom/hello-world-1.0.0",
+  "creationInfo": {
+    "created": "2025-06-01T12:00:00Z",
+    "creators": [
+      "Tool: syft-0.100.0"
+    ]
+  },
+  "packages": [
+    {
+      "name": "hello-world-app",
+      "SPDXID": "SPDXRef-RootPackage",
+      "versionInfo": "1.0.0",
+      "supplier": "Organization: Example Corp",
+      "downloadLocation": "https://github.com/example/hello-world",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "Copyright (c) 2025 Example Corp"
+    },
+    {
+      "name": "express",
+      "SPDXID": "SPDXRef-Package-Express",
+      "versionInfo": "4.18.2",
+      "supplier": "Organization: OpenJS Foundation",
+      "downloadLocation": "https://www.npmjs.com/package/express",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "Copyright (c) TJ Holowaychuk and Express Contributors"
+    },
+    {
+      "name": "dotenv",
+      "SPDXID": "SPDXRef-Package-Dotenv",
+      "versionInfo": "16.3.1",
+      "supplier": "NOASSERTION",
+      "downloadLocation": "https://www.npmjs.com/package/dotenv",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-2-Clause",
+      "licenseDeclared": "BSD-2-Clause",
+      "copyrightText": "Copyright (c) dotenv Contributors"
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-RootPackage"
+    },
+    {
+      "spdxElementId": "SPDXRef-RootPackage",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Express"
+    },
+    {
+      "spdxElementId": "SPDXRef-RootPackage",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Dotenv"
+    }
+  ]
+}

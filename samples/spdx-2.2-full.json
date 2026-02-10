@@ -1,0 +1,184 @@
+{
+  "spdxVersion": "SPDX-2.2",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "inventory-management-api",
+  "documentNamespace": "https://example.org/sbom/inventory-management-api-3.2.0",
+  "creationInfo": {
+    "created": "2025-09-12T16:30:00Z",
+    "creators": [
+      "Tool: Microsoft.SBOMTool-2.2.5",
+      "Organization: Contoso Ltd"
+    ],
+    "licenseListVersion": "3.22"
+  },
+  "packages": [
+    {
+      "name": "inventory-management-api",
+      "SPDXID": "SPDXRef-RootPackage",
+      "versionInfo": "3.2.0",
+      "supplier": "Organization: Contoso Ltd",
+      "downloadLocation": "https://github.com/contoso/inventory-api",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "Copyright (c) 2025 Contoso Ltd"
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore",
+      "SPDXID": "SPDXRef-Package-EFCore",
+      "versionInfo": "8.0.10",
+      "supplier": "Organization: Microsoft",
+      "downloadLocation": "https://www.nuget.org/packages/Microsoft.EntityFrameworkCore/8.0.10",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "Copyright (c) .NET Foundation and Contributors",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "abc123def456abc123def456abc123def456abc123def456abc123def456abc1"
+        }
+      ],
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Microsoft.EntityFrameworkCore@8.0.10"
+        }
+      ]
+    },
+    {
+      "name": "AutoMapper",
+      "SPDXID": "SPDXRef-Package-AutoMapper",
+      "versionInfo": "13.0.1",
+      "supplier": "Organization: AutoMapper Contributors",
+      "downloadLocation": "https://www.nuget.org/packages/AutoMapper/13.0.1",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "Copyright (c) Jimmy Bogard",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/AutoMapper@13.0.1"
+        }
+      ]
+    },
+    {
+      "name": "FluentValidation",
+      "SPDXID": "SPDXRef-Package-FluentValidation",
+      "versionInfo": "11.9.0",
+      "supplier": "Organization: Jeremy Skinner",
+      "downloadLocation": "https://www.nuget.org/packages/FluentValidation/11.9.0",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "Copyright (c) Jeremy Skinner",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/FluentValidation@11.9.0"
+        }
+      ]
+    },
+    {
+      "name": "Serilog",
+      "SPDXID": "SPDXRef-Package-Serilog",
+      "versionInfo": "3.1.1",
+      "supplier": "Organization: Serilog Contributors",
+      "downloadLocation": "https://www.nuget.org/packages/Serilog/3.1.1",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "Copyright (c) Serilog Contributors",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Serilog@3.1.1"
+        }
+      ]
+    },
+    {
+      "name": "Npgsql",
+      "SPDXID": "SPDXRef-Package-Npgsql",
+      "versionInfo": "8.0.1",
+      "supplier": "Organization: Npgsql Contributors",
+      "downloadLocation": "https://www.nuget.org/packages/Npgsql/8.0.1",
+      "filesAnalyzed": false,
+      "licenseConcluded": "PostgreSQL",
+      "licenseDeclared": "PostgreSQL",
+      "copyrightText": "Copyright (c) Npgsql Contributors",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Npgsql@8.0.1"
+        }
+      ]
+    },
+    {
+      "name": "Swashbuckle.AspNetCore",
+      "SPDXID": "SPDXRef-Package-Swashbuckle",
+      "versionInfo": "6.5.0",
+      "supplier": "Organization: Swashbuckle Contributors",
+      "downloadLocation": "https://www.nuget.org/packages/Swashbuckle.AspNetCore/6.5.0",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "Copyright (c) Swashbuckle Contributors",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Swashbuckle.AspNetCore@6.5.0"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-RootPackage"
+    },
+    {
+      "spdxElementId": "SPDXRef-RootPackage",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-EFCore"
+    },
+    {
+      "spdxElementId": "SPDXRef-RootPackage",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-AutoMapper"
+    },
+    {
+      "spdxElementId": "SPDXRef-RootPackage",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-FluentValidation"
+    },
+    {
+      "spdxElementId": "SPDXRef-RootPackage",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Serilog"
+    },
+    {
+      "spdxElementId": "SPDXRef-RootPackage",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Npgsql"
+    },
+    {
+      "spdxElementId": "SPDXRef-RootPackage",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Swashbuckle"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-EFCore",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Npgsql"
+    }
+  ]
+}
