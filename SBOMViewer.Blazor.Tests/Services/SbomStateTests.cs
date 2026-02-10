@@ -1,6 +1,6 @@
+using System.Text.Json;
 using FluentAssertions;
-using SBOMViewer.Blazor.Models.CycloneDX;
-using SBOMViewer.Blazor.Models.Spdx;
+using SBOMViewer.Blazor.Models;
 using SBOMViewer.Blazor.Services;
 
 namespace SBOMViewer.Blazor.Tests.Services;
@@ -8,79 +8,69 @@ namespace SBOMViewer.Blazor.Tests.Services;
 public class SbomStateTests
 {
     [Fact]
-    public void CycloneDXData_Set_TriggersOnChange()
+    public void Document_Set_TriggersOnChange()
     {
         var state = new SbomState();
         var fired = false;
         state.OnChange += () => fired = true;
 
-        state.CycloneDXData = new CycloneDXDocument();
+        state.Document = JsonDocument.Parse("{}");
 
         fired.Should().BeTrue();
     }
 
     [Fact]
-    public void CycloneDXData_SetNull_TriggersOnChange()
+    public void Document_SetNull_TriggersOnChange()
     {
         var state = new SbomState();
-        state.CycloneDXData = new CycloneDXDocument();
+        state.Document = JsonDocument.Parse("{}");
 
         var fired = false;
         state.OnChange += () => fired = true;
 
-        state.CycloneDXData = null;
+        state.Document = null;
 
         fired.Should().BeTrue();
     }
 
     [Fact]
-    public void SpdxData_Set_TriggersOnChange()
+    public void Document_Set_ValuePersisted()
+    {
+        var state = new SbomState();
+        var doc = JsonDocument.Parse("""{ "bomFormat": "CycloneDX" }""");
+
+        state.Document = doc;
+
+        state.Document.Should().BeSameAs(doc);
+    }
+
+    [Fact]
+    public void Clear_ResetsAllProperties()
+    {
+        var state = new SbomState();
+        state.Document = JsonDocument.Parse("{}");
+        state.Schema = new SchemaNode { PropertyName = "root" };
+        state.DetectedFormat = SbomFormat.CycloneDX_1_6;
+        state.FileName = "test.json";
+
+        state.Clear();
+
+        state.Document.Should().BeNull();
+        state.Schema.Should().BeNull();
+        state.DetectedFormat.Should().BeNull();
+        state.FileName.Should().BeNull();
+    }
+
+    [Fact]
+    public void Clear_TriggersOnChange()
     {
         var state = new SbomState();
         var fired = false;
         state.OnChange += () => fired = true;
 
-        state.SpdxData = new SpdxDocument();
+        state.Clear();
 
         fired.Should().BeTrue();
-    }
-
-    [Fact]
-    public void SpdxData_SetNull_TriggersOnChange()
-    {
-        var state = new SbomState();
-        state.SpdxData = new SpdxDocument();
-
-        var fired = false;
-        state.OnChange += () => fired = true;
-
-        state.SpdxData = null;
-
-        fired.Should().BeTrue();
-    }
-
-    [Fact]
-    public void CycloneDXFileName_Set_DoesNotTriggerOnChange()
-    {
-        var state = new SbomState();
-        var fired = false;
-        state.OnChange += () => fired = true;
-
-        state.CycloneDXFileName = "test.json";
-
-        fired.Should().BeFalse();
-    }
-
-    [Fact]
-    public void SpdxFileName_Set_DoesNotTriggerOnChange()
-    {
-        var state = new SbomState();
-        var fired = false;
-        state.OnChange += () => fired = true;
-
-        state.SpdxFileName = "test.json";
-
-        fired.Should().BeFalse();
     }
 
     [Fact]
@@ -88,31 +78,9 @@ public class SbomStateTests
     {
         var state = new SbomState();
 
-        var act = () => state.CycloneDXData = new CycloneDXDocument();
+        var act = () => state.Document = JsonDocument.Parse("{}");
 
         act.Should().NotThrow();
-    }
-
-    [Fact]
-    public void CycloneDXData_Set_ValuePersisted()
-    {
-        var state = new SbomState();
-        var doc = new CycloneDXDocument { BomFormat = "CycloneDX" };
-
-        state.CycloneDXData = doc;
-
-        state.CycloneDXData.Should().BeSameAs(doc);
-    }
-
-    [Fact]
-    public void SpdxData_Set_ValuePersisted()
-    {
-        var state = new SbomState();
-        var doc = new SpdxDocument { Name = "Test" };
-
-        state.SpdxData = doc;
-
-        state.SpdxData.Should().BeSameAs(doc);
     }
 
     [Fact]
@@ -123,8 +91,20 @@ public class SbomStateTests
         state.OnChange += () => count++;
         state.OnChange += () => count++;
 
-        state.SpdxData = new SpdxDocument();
+        state.Document = JsonDocument.Parse("{}");
 
         count.Should().Be(2);
+    }
+
+    [Fact]
+    public void FileName_Set_DoesNotTriggerOnChange()
+    {
+        var state = new SbomState();
+        var fired = false;
+        state.OnChange += () => fired = true;
+
+        state.FileName = "test.json";
+
+        fired.Should().BeFalse();
     }
 }

@@ -1,4 +1,6 @@
+@using System.Text.Json
 @inject SbomState SbomState
+@inject SchemaService SchemaService
 
 <!-- Container -->
 <FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center" Style="max-width:800px; margin:auto; padding:1rem; gap:0.5rem;">
@@ -75,43 +77,49 @@
             if (result.IsUnsupportedVersion)
             {
                 errorMessage = $"Version \"{result.DetectedVersion}\" is not supported. Supported versions: {string.Join(", ", SbomFormatDetector.SupportedVersions)}.";
-                ClearState();
+                SbomState.Clear();
             }
             else if (result.Format == null)
             {
                 errorMessage = "Unrecognized SBOM format. Please upload a valid CycloneDX or SPDX JSON file.";
-                ClearState();
-            }
-            else if (result.Format == SbomFormat.SPDX_2_2)
-            {
-                SbomState.SpdxData = SpdxParser.ParseSpdxJsonAsync(content).Result;
-                SbomState.SpdxFileName = file.Name;
-
-                // Clear CycloneDX
-                SbomState.CycloneDXData = null;
-                SbomState.CycloneDXFileName = null;
+                SbomState.Clear();
             }
             else
             {
-                // CycloneDX 1.6 or 1.7 — same parser handles both
-                SbomState.CycloneDXData = CycloneDXParser.ParseCycloneDXBomJsonAsyncParseJson(content).Result;
-                SbomState.CycloneDXFileName = file.Name;
+                try
+                {
+                    var jsonDoc = JsonDocument.Parse(content, new JsonDocumentOptions
+                    {
+                        CommentHandling = JsonCommentHandling.Skip,
+                        AllowTrailingCommas = true
+                    });
 
-                // Clear SPDX
-                SbomState.SpdxData = null;
-                SbomState.SpdxFileName = null;
+                    // Lightweight validation of required fields
+                    var validationError = SbomFormatDetector.Validate(jsonDoc.RootElement, result.Format.Value);
+                    if (validationError != null)
+                    {
+                        errorMessage = validationError;
+                        jsonDoc.Dispose();
+                        SbomState.Clear();
+                    }
+                    else
+                    {
+                        var schema = SchemaService.BuildFromJson(jsonDoc.RootElement);
+                        SbomState.Schema = schema;
+                        SbomState.DetectedFormat = result.Format;
+                        SbomState.FileName = file.Name;
+                        SbomState.Document = jsonDoc; // Triggers notification
+                    }
+                }
+                catch (JsonException)
+                {
+                    errorMessage = "Failed to parse JSON content.";
+                    SbomState.Clear();
+                }
             }
         }
 
         isLoading = false;
         StateHasChanged();
-    }
-
-    private void ClearState()
-    {
-        SbomState.CycloneDXData = null;
-        SbomState.CycloneDXFileName = null;
-        SbomState.SpdxData = null;
-        SbomState.SpdxFileName = null;
     }
 }

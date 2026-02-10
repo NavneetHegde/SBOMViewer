@@ -1,0 +1,132 @@
+@using System.Text.Json
+@using Microsoft.FluentUI.AspNetCore.Components
+@using SBOMViewer.Blazor.Models
+
+@if (Element.ValueKind == JsonValueKind.Array)
+{
+    var isSearchable = Schema?.Hint == RenderHint.SearchableList
+                       || Element.GetArrayLength() > 5;
+
+    <div style="display:flex; flex-direction:column; gap:0.5rem;">
+        @if (isSearchable)
+        {
+            <FluentSearch @bind-Value="searchText" Style="width:100%"
+                          Placeholder="@($"Search {Schema?.Title ?? PropertyName}")"
+                          AutoComplete="off" />
+        }
+
+        <div class="scroll-container" style="max-height:400px; overflow-y:auto; padding-right:0.5rem;">
+            @foreach (var item in FilterArrayItems(Element, searchText))
+            {
+                @if (item.ValueKind == JsonValueKind.Object)
+                {
+                    var summary = GetItemSummary(item);
+                    <details>
+                        <summary>@summary</summary>
+                        <div style="padding-left:1.2rem; padding-top:0.3rem; padding-bottom:0.3rem; border-left:2px solid var(--neutral-stroke-rest);">
+                            <DynamicObject Element="@item" Schema="@Schema?.ItemSchema" />
+                        </div>
+                    </details>
+                }
+                else
+                {
+                    <div>@FormatValue(item)</div>
+                }
+            }
+        </div>
+    </div>
+}
+else if (Element.ValueKind == JsonValueKind.Object)
+{
+    <DynamicObject Element="@Element" Schema="@Schema" />
+}
+else
+{
+    <div>@FormatValue(Element)</div>
+}
+
+@code {
+    [Parameter] public JsonElement Element { get; set; }
+    [Parameter] public SchemaNode? Schema { get; set; }
+    [Parameter] public string PropertyName { get; set; } = "";
+
+    private string searchText = string.Empty;
+
+    private static IEnumerable<JsonElement> FilterArrayItems(JsonElement array, string search)
+    {
+        if (string.IsNullOrWhiteSpace(search))
+            return array.EnumerateArray();
+
+        return array.EnumerateArray()
+            .Where(item => item.GetRawText()
+                .Contains(search, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string GetItemSummary(JsonElement obj)
+    {
+        string[] summaryFields = ["name", "ref", "fileName", "spdxElementId",
+                                   "bom-ref", "bomRef", "SPDXID", "summary"];
+        string[] versionFields = ["version", "versionInfo", "specVersion"];
+        string[] typeFields = ["type", "scope", "phase", "relationshipType",
+                               "relatedSpdxElement"];
+
+        var parts = new List<string>();
+
+        foreach (var field in summaryFields)
+        {
+            if (obj.TryGetProperty(field, out var val) && val.ValueKind == JsonValueKind.String)
+            {
+                var str = val.GetString();
+                if (!string.IsNullOrWhiteSpace(str))
+                {
+                    parts.Add(str);
+                    break;
+                }
+            }
+        }
+
+        foreach (var field in versionFields)
+        {
+            if (obj.TryGetProperty(field, out var val) && val.ValueKind == JsonValueKind.String)
+            {
+                var str = val.GetString();
+                if (!string.IsNullOrWhiteSpace(str))
+                {
+                    parts.Add(str);
+                    break;
+                }
+            }
+        }
+
+        foreach (var field in typeFields)
+        {
+            if (obj.TryGetProperty(field, out var val) && val.ValueKind == JsonValueKind.String)
+            {
+                var str = val.GetString();
+                if (!string.IsNullOrWhiteSpace(str))
+                {
+                    parts.Add(str);
+                    break;
+                }
+            }
+        }
+
+        // For dependencies: show count of dependsOn
+        if (obj.TryGetProperty("dependsOn", out var dependsOn) && dependsOn.ValueKind == JsonValueKind.Array)
+        {
+            parts.Add($"#{dependsOn.GetArrayLength()}");
+        }
+
+        return parts.Count > 0 ? string.Join(" | ", parts) : "(item)";
+    }
+
+    private static string FormatValue(JsonElement el) => el.ValueKind switch
+    {
+        JsonValueKind.String => el.GetString() ?? "",
+        JsonValueKind.Number => el.GetRawText(),
+        JsonValueKind.True => "true",
+        JsonValueKind.False => "false",
+        JsonValueKind.Null => "(null)",
+        _ => el.GetRawText()
+    };
+}

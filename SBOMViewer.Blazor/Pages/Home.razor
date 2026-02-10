@@ -3,19 +3,13 @@
 
 <FluentStack Orientation="Orientation.Vertical" Style="gap:1.5rem;">
 
-    @if (SbomState.CycloneDXData is not null)
+    @if (SbomState.Document is not null && SbomState.Schema is not null)
     {
-        <CycloneDXViewer Document="@SbomState.CycloneDXData"
-                         DocumentFileName="@SbomState.CycloneDXFileName" />
+        <DynamicSbomViewer RootElement="@SbomState.Document.RootElement"
+                           Schema="@SbomState.Schema"
+                           FileName="@SbomState.FileName" />
     }
-
-    @if (SbomState.SpdxData is not null)
-    {
-        <SpdxViewer Document="@SbomState.SpdxData"
-                    DocumentFileName="@SbomState.SpdxFileName" />
-    }
-
-    @if (SbomState.CycloneDXData is null && SbomState.SpdxData is null)
+    else
     {
         <FluentCard Style="padding:1rem; text-align:center; color:var(--neutral-foreground-2);">
             No SBOM loaded yet. Please select a format and upload a file.

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 using SBOMViewer.Blazor.Models;
 using SBOMViewer.Blazor.Services;
@@ -177,5 +178,91 @@ public class SbomFormatDetectorTests
         SbomFormatDetector.SupportedVersions.Should().Contain("CycloneDX 1.7");
         SbomFormatDetector.SupportedVersions.Should().Contain("SPDX 2.2");
         SbomFormatDetector.SupportedVersions.Should().HaveCount(3);
+    }
+
+    // ─── Lightweight validation tests ─────────────────────────
+
+    [Fact]
+    public void Validate_ValidCycloneDX_ReturnsNull()
+    {
+        using var doc = JsonDocument.Parse(TestJson.ValidCycloneDXWithComponents);
+        var result = SbomFormatDetector.Validate(doc.RootElement, SbomFormat.CycloneDX_1_6);
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public void Validate_CycloneDXMissingComponents_ReportsError()
+    {
+        using var doc = JsonDocument.Parse(TestJson.ValidCycloneDXMinimal);
+        var result = SbomFormatDetector.Validate(doc.RootElement, SbomFormat.CycloneDX_1_6);
+
+        result.Should().NotBeNull();
+        result.Should().Contain("components");
+    }
+
+    [Fact]
+    public void Validate_CycloneDXMissingMetadata_ReportsError()
+    {
+        using var doc = JsonDocument.Parse(TestJson.CycloneDXMissingMetadata);
+        var result = SbomFormatDetector.Validate(doc.RootElement, SbomFormat.CycloneDX_1_7);
+
+        result.Should().NotBeNull();
+        result.Should().Contain("metadata");
+        result.Should().Contain("components");
+    }
+
+    [Fact]
+    public void Validate_CycloneDXMissingBomFormat_ReportsError()
+    {
+        using var doc = JsonDocument.Parse(TestJson.CycloneDXMissingBomFormat);
+        var result = SbomFormatDetector.Validate(doc.RootElement, SbomFormat.CycloneDX_1_6);
+
+        result.Should().NotBeNull();
+        result.Should().Contain("bomFormat");
+    }
+
+    [Fact]
+    public void Validate_ValidSpdx_ReturnsNull()
+    {
+        using var doc = JsonDocument.Parse(TestJson.ValidSpdxMinimal);
+        var result = SbomFormatDetector.Validate(doc.RootElement, SbomFormat.SPDX_2_2);
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public void Validate_SpdxMissingName_ReportsError()
+    {
+        using var doc = JsonDocument.Parse(TestJson.SpdxMissingName);
+        var result = SbomFormatDetector.Validate(doc.RootElement, SbomFormat.SPDX_2_2);
+
+        result.Should().NotBeNull();
+        result.Should().Contain("name");
+    }
+
+    [Fact]
+    public void Validate_SpdxNullCreationInfo_ReportsError()
+    {
+        using var doc = JsonDocument.Parse(TestJson.SpdxNullCreationInfo);
+        var result = SbomFormatDetector.Validate(doc.RootElement, SbomFormat.SPDX_2_2);
+
+        result.Should().NotBeNull();
+        result.Should().Contain("creationInfo");
+    }
+
+    [Fact]
+    public void Validate_SpdxMissingMultipleFields_ReportsAll()
+    {
+        var json = """{ "spdxVersion": "SPDX-2.2" }""";
+        using var doc = JsonDocument.Parse(json);
+        var result = SbomFormatDetector.Validate(doc.RootElement, SbomFormat.SPDX_2_2);
+
+        result.Should().NotBeNull();
+        result.Should().Contain("name");
+        result.Should().Contain("SPDXID");
+        result.Should().Contain("dataLicense");
+        result.Should().Contain("documentNamespace");
+        result.Should().Contain("creationInfo");
     }
 }

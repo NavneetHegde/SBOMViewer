@@ -14,6 +14,60 @@ public static class SbomFormatDetector
 
     public static SbomFormat? Detect(string jsonContent) => DetectWithDetails(jsonContent).Format;
 
+    /// <summary>
+    /// Lightweight validation: checks required fields are present for the detected format.
+    /// Returns null if valid, or an error message string if invalid.
+    /// </summary>
+    public static string? Validate(JsonElement root, SbomFormat format)
+    {
+        return format switch
+        {
+            SbomFormat.CycloneDX_1_6 or SbomFormat.CycloneDX_1_7 => ValidateCycloneDX(root),
+            SbomFormat.SPDX_2_2 => ValidateSpdx(root),
+            _ => null
+        };
+    }
+
+    private static string? ValidateCycloneDX(JsonElement root)
+    {
+        var missing = new List<string>();
+
+        if (!root.TryGetProperty("bomFormat", out _))
+            missing.Add("bomFormat");
+        if (!root.TryGetProperty("specVersion", out _))
+            missing.Add("specVersion");
+        if (!root.TryGetProperty("metadata", out var metadata) || metadata.ValueKind != JsonValueKind.Object)
+            missing.Add("metadata");
+        if (!root.TryGetProperty("components", out var components) || components.ValueKind != JsonValueKind.Array)
+            missing.Add("components");
+
+        return missing.Count > 0
+            ? $"Invalid CycloneDX: missing required fields: {string.Join(", ", missing)}"
+            : null;
+    }
+
+    private static string? ValidateSpdx(JsonElement root)
+    {
+        var missing = new List<string>();
+
+        if (!root.TryGetProperty("spdxVersion", out _))
+            missing.Add("spdxVersion");
+        if (!root.TryGetProperty("name", out _))
+            missing.Add("name");
+        if (!root.TryGetProperty("SPDXID", out _))
+            missing.Add("SPDXID");
+        if (!root.TryGetProperty("dataLicense", out _))
+            missing.Add("dataLicense");
+        if (!root.TryGetProperty("documentNamespace", out _))
+            missing.Add("documentNamespace");
+        if (!root.TryGetProperty("creationInfo", out var ci) || ci.ValueKind != JsonValueKind.Object)
+            missing.Add("creationInfo");
+
+        return missing.Count > 0
+            ? $"Invalid SPDX: missing required fields: {string.Join(", ", missing)}"
+            : null;
+    }
+
     public static DetectionResult DetectWithDetails(string jsonContent)
     {
         if (string.IsNullOrWhiteSpace(jsonContent))

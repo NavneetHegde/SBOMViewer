@@ -8,6 +8,7 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 builder.Services.AddSingleton<SbomState>();
+builder.Services.AddSingleton<SchemaService>();
 builder.Services.AddFluentUIComponents();
 
 await builder.Build().RunAsync();
