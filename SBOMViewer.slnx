@@ -1,0 +1,10 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="src/SBOMViewer.Blazor/SBOMViewer.Blazor.csproj" />
+  <Project Path="tests/SBOMViewer.Blazor.Tests/SBOMViewer.Blazor.Tests.csproj" />
+  <Project Path="tests/SBOMViewer.E2E.Tests/SBOMViewer.E2E.Tests.csproj" />
+</Solution>

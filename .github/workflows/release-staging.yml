@@ -1,0 +1,144 @@
+name: Release Staging — Bump Patch, Deploy, Create PR to main
+
+on:
+  push:
+    branches: ['release/*']
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'docs/**'
+      - '**.txt'
+
+jobs:
+  staging:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # push version-bump commit
+      pull-requests: write  # create PR to main
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Use a PAT (RELEASE_PAT secret) if branch protection rules block the bot from pushing.
+          # GITHUB_TOKEN works when "Allow GitHub Actions to create pull requests"
+          # is enabled in repo Settings → Actions → General.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read and bump patch version
+        id: version
+        run: |
+          CURRENT=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
+          MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT" | cut -d. -f2)
+          PATCH=$(echo "$CURRENT" | cut -d. -f3)
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+          sed -i "s|<Version>$CURRENT</Version>|<Version>$NEW_VERSION</Version>|" Directory.Build.props
+          echo "old=$CURRENT" >> $GITHUB_OUTPUT
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Bumped $CURRENT → $NEW_VERSION"
+
+      - name: Commit and push version bump
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Directory.Build.props
+          git commit -m "chore: bump patch to ${{ steps.version.outputs.version }} [skip ci]"
+          git push
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - run: dotnet restore SBOMViewer.slnx
+
+      - run: dotnet build SBOMViewer.slnx --no-restore -c Release
+
+      - name: Run unit tests
+        run: |
+          dotnet test tests/SBOMViewer.Blazor.Tests/SBOMViewer.Blazor.Tests.csproj \
+            --no-build -c Release \
+            --logger "trx;LogFileName=unit-tests.trx" \
+            --results-directory TestResults
+
+      - run: dotnet publish src/SBOMViewer.Blazor/SBOMViewer.Blazor.csproj -c Release --output publish_output
+
+      - name: Deploy staging environment to Azure SWA
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "publish_output/wwwroot"
+          api_location: ""
+          output_location: ""
+          skip_app_build: true
+          deployment_environment: "staging"  # named pre-prod env (Standard plan only)
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install -g serve
+
+      - name: Start static file server for E2E (SPA mode)
+        run: serve -s publish_output/wwwroot -l 5000 &
+
+      - name: Wait for server
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:5000 > /dev/null 2>&1 && echo "Ready in ${i}s" && exit 0
+            sleep 1
+          done
+          echo "Server not ready"; exit 1
+
+      - name: Install Playwright Chromium
+        run: pwsh tests/SBOMViewer.E2E.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Run E2E tests
+        env:
+          BASE_URL: http://localhost:5000
+          PLAYWRIGHT_BROWSERS_PATH: 0
+        run: |
+          dotnet test tests/SBOMViewer.E2E.Tests/SBOMViewer.E2E.Tests.csproj \
+            --no-build -c Release \
+            --logger "trx;LogFileName=e2e-tests.trx" \
+            --results-directory TestResults
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-staging
+          path: TestResults/
+          retention-days: 14
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces-staging
+          path: tests/SBOMViewer.E2E.Tests/bin/Release/net10.0/playwright-traces/
+          retention-days: 7
+
+      - name: Create PR to main
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          VERSION="${{ steps.version.outputs.version }}"
+          OLD="${{ steps.version.outputs.old }}"
+          gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "Release v${VERSION}" \
+            --body "## Release v${VERSION}
+
+          Automated release PR created after staging CI passed on branch \`${BRANCH}\`.
+
+          - Patch bumped: ${OLD} → ${VERSION}
+          - All unit tests passed
+          - All Playwright E2E tests passed against staging build
+
+          **Merge this PR to deploy to production.**" \
+            --label "release" 2>/dev/null || echo "PR already open — skipping creation"

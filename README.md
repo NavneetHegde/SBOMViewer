@@ -5,7 +5,7 @@
 [**SBOM Viewer**](https://sbomviewer.com)
 
 <div align="center">
-  <img src="./sbomviewer_v2.jpeg" alt="SBOM Viewer Screenshot" width="600">
+  <img width="600" height="898" alt="image" src="https://github.com/user-attachments/assets/84849ad3-0a52-435e-bbf2-707f230c9ab6" />
 </div>
 
 SBOM Viewer is a web application built with Blazor WebAssembly that provides an interactive, user-friendly interface for viewing and exploring parsed SPDX and CycloneDX JSON files.
@@ -40,24 +40,16 @@ For the complete history of changes, see [CHANGELOG.md](./CHANGELOG.md).
 1. Clone the repository:
    ```bash
    git clone https://github.com/NavneetHegde/SBOMViewer.git
-   ```
-
-2. Navigate to the project directory:
-   ```bash
    cd SBOMViewer
    ```
 
-3. Restore the dependencies:
+2. Restore dependencies and run:
    ```bash
    dotnet restore
+   dotnet run --project src/SBOMViewer.Blazor
    ```
 
-4. Run the application:
-   ```bash
-   dotnet run --project SBOMViewer.Blazor
-   ```
-
-   This will launch the app in your browser at `https://localhost:5157`.
+   The app will be available at `https://localhost:5157`.
 
 ## Usage
 
@@ -89,27 +81,62 @@ The [`samples/`](./samples/) folder contains ready-to-use SBOM files for testing
 ## Project Structure
 
 ```
-SBOMViewer.sln
-├── SBOMViewer.Blazor/          # Main Blazor WASM project
-│   ├── Components/             # UploadFile, DynamicSbomViewer, DynamicSection, DynamicObject
-│   ├── Models/                 # SbomFormat, SchemaNode
-│   ├── Services/               # SchemaService, SbomState, SbomFormatDetector
-│   ├── Pages/                  # Home page
-│   └── Layout/                 # MainLayout (header, toolbar, footer)
-├── SBOMViewer.Blazor.Tests/    # xUnit + FluentAssertions test suite
-├── samples/                    # Sample SBOM JSON files
-└── docs/                       # Design docs and plans
+SBOMViewer.slnx
+├── src/
+│   └── SBOMViewer.Blazor/          # Blazor WASM application
+│       ├── Components/             # UploadFile, DynamicSbomViewer, DynamicSection, DynamicObject
+│       ├── Models/                 # SbomFormat, SchemaNode
+│       ├── Services/               # SchemaService, SbomState, SbomFormatDetector
+│       ├── Pages/                  # Home page
+│       └── Layout/                 # MainLayout (header, toolbar, footer)
+├── tests/
+│   ├── SBOMViewer.Blazor.Tests/    # xUnit + FluentAssertions unit tests
+│   └── SBOMViewer.E2E.Tests/       # Playwright end-to-end tests
+├── samples/                        # Sample SBOM JSON files
+└── docs/                           # Design docs and plans
 ```
+
+## Development
+
+### Build & test
+
+```bash
+dotnet build SBOMViewer.slnx -c Release
+dotnet test tests/SBOMViewer.Blazor.Tests -c Release --no-build
+```
+
+### E2E tests (Playwright)
+
+```bash
+# Publish and serve the app
+dotnet publish src/SBOMViewer.Blazor -c Release --output publish_output
+npx serve -s publish_output/wwwroot -l 5000 &
+
+# Install Chromium (first time only)
+pwsh tests/SBOMViewer.E2E.Tests/bin/Release/net10.0/playwright.ps1 install chromium
+
+# Run E2E tests
+dotnet test tests/SBOMViewer.E2E.Tests -c Release --no-build -e BASE_URL=http://localhost:5000
+```
+
+### CI/CD
+
+| Workflow | Trigger | What it does |
+|----------|---------|--------------|
+| `ci.yml` | PR to `main` or `release/*` | Build, unit tests, Playwright E2E |
+| `release-staging.yml` | Push to `release/*` | Bump patch version, deploy staging, run all tests, open PR to `main` |
+| `azure-static-web-apps-sbomviewer.yml` | Push to `main` | Build, unit tests, deploy to production, create GitHub release |
+| `deploy-bicep.yml` | Change to `Infra/main.bicep` | Deploy Azure infrastructure |
 
 ## Contributing
 
-We welcome contributions to improve the project! Feel free to fork the repository, open issues, or submit pull requests.
+Contributions are welcome. Feel free to fork the repository, open issues, or submit pull requests.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgements
 
-- Thanks to the Blazor community for providing the framework that makes this project possible.
 - [CycloneDX](https://cyclonedx.org/) and [SPDX](https://spdx.dev/) for the SBOM specifications.
+- The Blazor and Fluent UI communities for the frameworks that make this project possible.
