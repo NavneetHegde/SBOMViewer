@@ -23,7 +23,7 @@ jobs:
           # Use a PAT (RELEASE_PAT secret) if branch protection rules block the bot from pushing.
           # GITHUB_TOKEN works when "Allow GitHub Actions to create pull requests"
           # is enabled in repo Settings → Actions → General.
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PAT_SBOM }}
 
       - name: Read and bump patch version
         id: version
