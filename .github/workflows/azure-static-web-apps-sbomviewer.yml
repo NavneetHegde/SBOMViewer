@@ -40,6 +40,18 @@ jobs:
 
       - run: dotnet publish src/SBOMViewer.Blazor/SBOMViewer.Blazor.csproj -c Release --output publish_output
 
+      - name: Generate SBOM
+        run: |
+          dotnet tool install --global CycloneDX
+          VERSION=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
+          dotnet CycloneDX src/SBOMViewer.Blazor/SBOMViewer.Blazor.csproj \
+            -o publish_output/wwwroot \
+            -fn "sbomviewer_${VERSION}.json" \
+            -F Json \
+            -t \
+            -sv "$VERSION" \
+            -sn SBOMViewer
+
       - uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}

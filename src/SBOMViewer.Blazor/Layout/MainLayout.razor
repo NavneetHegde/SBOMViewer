@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @inject SbomState SbomState
+@using System.Reflection
 
 @code {
     private DesignThemeModes ThemeMode = DesignThemeModes.System;
@@ -10,7 +11,10 @@
     }
 
     private string AppVersion =>
-        typeof(MainLayout).Assembly.GetName().Version?.ToString(3) ?? "unknown";
+        typeof(MainLayout).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion.Split('+')[0]
+        ?? "unknown";
 }
 <FluentDesignTheme Mode="@ThemeMode" StorageName="theme" OfficeColor="OfficeColor.Windows" />
 <div class="app-container">
@@ -52,8 +56,13 @@
         </FluentStack>
 
         <!-- Footer -->
-        <FluentFooter Style="padding:0.5rem; display:flex; justify-content:center; align-items:center; font-size:0.85rem; color:var(--neutral-foreground-2); border-top:1px solid var(--neutral-stroke-1); flex-shrink:0;">
-            © 2025. Licensed under the MIT License. SBOM Viewer v@AppVersion
+        <FluentFooter Style="padding:0.5rem; display:flex; justify-content:center; align-items:center; gap:0.75rem; font-size:0.85rem; color:var(--neutral-foreground-2); border-top:1px solid var(--neutral-stroke-1); flex-shrink:0;">
+            <span>© @DateTime.Now.Year Licensed under the MIT License | SBOM Viewer v@(AppVersion)</span>
+            <span>|</span>
+            <FluentAnchor Href="@($"sbomviewer_{AppVersion}.json")" Download="@($"sbomviewer_{AppVersion}.json")" Appearance="Appearance.Hypertext"
+                          IconStart="@(new Icons.Regular.Size16.ArrowDownload())"
+                          Class="no-icon-margin" Style="font-size:0.85rem;">SBOM
+            </FluentAnchor>
         </FluentFooter>
 
     </FluentLayout>
