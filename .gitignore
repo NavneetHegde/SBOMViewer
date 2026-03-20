@@ -447,6 +447,8 @@ node_modules/
 
 # Published output
 publish/
+publish_output/
+
 
 # Logs and temporary files
 *.log
