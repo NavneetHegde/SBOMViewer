@@ -1,6 +1,6 @@
 using NUnit.Framework;
 
-namespace SBOMViewer.E2E;
+namespace SBOMViewer.E2E.Tests;
 
 [TestFixture]
 public class HomePageTests : TestBase
@@ -11,7 +11,8 @@ public class HomePageTests : TestBase
 
     [Test]
     public async Task Header_DisplaysAppName() =>
-        await Expect(Page.Locator("fluent-header span")).ToContainTextAsync("SBOM Viewer");
+        // FluentHeader renders as a standard <header> element, not a web component
+        await Expect(Page.Locator("header")).ToContainTextAsync("SBOM Viewer");
 
     [Test]
     public async Task UploadButton_IsVisible() =>
@@ -41,6 +42,6 @@ public class HomePageTests : TestBase
 
     [Test]
     public async Task Footer_ContainsCopyright() =>
-        // FluentFooter in MainLayout.razor: "© 2025. Licensed under the MIT License. SBOM Viewer v3.0"
-        await Expect(Page.Locator("fluent-footer")).ToContainTextAsync("SBOM Viewer v3.0");
+        // FluentFooter renders as a standard <footer> element, not a web component
+        await Expect(Page.Locator("footer")).ToContainTextAsync("SBOM Viewer v3.0");
 }

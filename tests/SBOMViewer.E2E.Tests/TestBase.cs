@@ -1,7 +1,7 @@
 using Microsoft.Playwright.NUnit;
 using NUnit.Framework;
 
-namespace SBOMViewer.E2E;
+namespace SBOMViewer.E2E.Tests;
 
 public abstract class TestBase : PageTest
 {

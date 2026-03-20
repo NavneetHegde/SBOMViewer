@@ -1,13 +1,13 @@
 using NUnit.Framework;
 
-namespace SBOMViewer.E2E;
+namespace SBOMViewer.E2E.Tests;
 
 [TestFixture]
 public class FileUploadTests : TestBase
 {
     // Navigate 4 levels up from bin/Release/net10.0/ to repo root, then into samples/
     private static string SamplesDir =>
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../samples"));
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../samples"));
 
     private async Task UploadFile(string filePath)
     {
@@ -48,7 +48,7 @@ public class FileUploadTests : TestBase
     public async Task Upload_SPDX22_ShowsPackagesSection()
     {
         await UploadFile(Path.Combine(SamplesDir, "spdx-2.2-minimal.json"));
-        await Expect(Page.Locator("fluent-accordion-item", new() { HasText = "Packages" }))
+        await Expect(Page.Locator("fluent-accordion-item", new() { HasText = "Packages" }).First)
             .ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
@@ -91,7 +91,8 @@ public class FileUploadTests : TestBase
         await Page.Locator("fluent-accordion-item", new() { HasText = "Components" }).ClickAsync();
         var searchBox = Page.Locator("fluent-search").First;
         await Expect(searchBox).ToBeVisibleAsync(new() { Timeout = 15_000 });
-        await searchBox.FillAsync("express");
+        // fluent-search is a web component — fill its inner <input> directly
+        await searchBox.Locator("input").FillAsync("express");
         // Verify some filtered results remain visible
         Assert.That(await Page.Locator("details:visible").CountAsync(), Is.GreaterThan(0));
     }

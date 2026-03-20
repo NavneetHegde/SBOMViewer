@@ -1,6 +1,6 @@
 using NUnit.Framework;
 
-namespace SBOMViewer.E2E;
+namespace SBOMViewer.E2E.Tests;
 
 [SetUpFixture]
 public class PlaywrightSetup
