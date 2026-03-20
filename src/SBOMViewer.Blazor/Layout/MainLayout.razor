@@ -8,6 +8,9 @@
     {
         ThemeMode = ThemeMode == DesignThemeModes.Light ? DesignThemeModes.Dark : DesignThemeModes.Light;
     }
+
+    private string AppVersion =>
+        typeof(MainLayout).Assembly.GetName().Version?.ToString(3) ?? "unknown";
 }
 <FluentDesignTheme Mode="@ThemeMode" StorageName="theme" OfficeColor="OfficeColor.Windows" />
 <div class="app-container">
@@ -50,7 +53,7 @@
 
         <!-- Footer -->
         <FluentFooter Style="padding:0.5rem; display:flex; justify-content:center; align-items:center; font-size:0.85rem; color:var(--neutral-foreground-2); border-top:1px solid var(--neutral-stroke-1); flex-shrink:0;">
-            © 2025. Licensed under the MIT License. SBOM Viewer v3.0
+            © 2025. Licensed under the MIT License. SBOM Viewer v@AppVersion
         </FluentFooter>
 
     </FluentLayout>
