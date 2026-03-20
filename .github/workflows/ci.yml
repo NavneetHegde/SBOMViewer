@@ -1,0 +1,77 @@
+name: CI — Build, Unit Tests, and E2E Tests
+
+on:
+  pull_request:
+    branches: [main, 'release/*']
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'docs/**'
+      - '**.txt'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - run: dotnet restore SBOMViewer.slnx
+
+      - run: dotnet build SBOMViewer.slnx --no-restore -c Release
+
+      - name: Run unit tests
+        run: |
+          dotnet test tests/SBOMViewer.Blazor.Tests/SBOMViewer.Blazor.Tests.csproj \
+            --no-build -c Release \
+            --logger "trx;LogFileName=unit-tests.trx" \
+            --results-directory TestResults
+
+      - run: dotnet publish src/SBOMViewer.Blazor/SBOMViewer.Blazor.csproj -c Release --output publish_output
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm install -g serve
+
+      - name: Start static file server (SPA mode)
+        run: serve -s publish_output/wwwroot -l 5000 &
+
+      - name: Wait for server
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:5000 > /dev/null 2>&1 && echo "Ready in ${i}s" && exit 0
+            sleep 1
+          done
+          echo "Server not ready"; exit 1
+
+      - name: Install Playwright Chromium
+        run: pwsh tests/SBOMViewer.E2E.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      - name: Run E2E tests
+        env:
+          BASE_URL: http://localhost:5000
+          PLAYWRIGHT_BROWSERS_PATH: 0
+        run: |
+          dotnet test tests/SBOMViewer.E2E.Tests/SBOMViewer.E2E.Tests.csproj \
+            --no-build -c Release \
+            --logger "trx;LogFileName=e2e-tests.trx" \
+            --results-directory TestResults
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/
+          retention-days: 14
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: tests/SBOMViewer.E2E.Tests/bin/Release/net10.0/playwright-traces/
+          retention-days: 7
