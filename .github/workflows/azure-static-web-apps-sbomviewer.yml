@@ -1,40 +1,79 @@
-name: Deploy Blazor WebAssembly to Azure Static Web App
+name: Deploy Blazor WASM to Azure Static Web App
 
 on:
   push:
-    branches:
-      - main  # Change if your main branch is different
-    paths:
-      - '**/*'  # Include all files by default
-      - '!README.md'  # Exclude README.md specifically
-      - '!**/*.txt'  # Exclude all .txt files 
-  workflow_dispatch:  # Allow manual deployment if needed
+    branches: [main]
+    paths-ignore:
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'docs/**'
+      - '**.txt'
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
-
+    if: >
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && github.event.action != 'closed')
+    permissions:
+      contents: write  # needed to create GitHub releases
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v3
+      - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x' 
+          dotnet-version: '10.0.x'
 
-      - name: Restore Dependencies
-        run: dotnet restore
+      - run: dotnet restore SBOMViewer.slnx
 
-      - name: Build Blazor WebAssembly
-        run: dotnet publish -c Release --output publish_output
+      - run: dotnet build SBOMViewer.slnx --no-restore -c Release
 
-      - name: Deploy to Azure Static Web App
-        uses: Azure/static-web-apps-deploy@v1
+      - name: Run unit tests
+        run: |
+          dotnet test tests/SBOMViewer.Blazor.Tests/SBOMViewer.Blazor.Tests.csproj \
+            --no-build -c Release
+
+      - run: dotnet publish src/SBOMViewer.Blazor/SBOMViewer.Blazor.csproj -c Release --output publish_output
+
+      - uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
-          app_location: "publish_output/wwwroot"  # Correct output for Blazor WASM
-          api_location: ""  # Leave blank for no API
-          output_location: ""  # Not needed for Blazor
+          app_location: "publish_output/wwwroot"
+          api_location: ""
+          output_location: ""
+          skip_app_build: true   # Already published above
+
+      - name: Read version
+        id: version
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          VERSION=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub release
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          gh release create "v${VERSION}" \
+            --title "v${VERSION}" \
+            --notes "Deployed to [sbomviewer.com](https://sbomviewer.com) from commit ${{ github.sha }}." \
+            --latest 2>/dev/null || echo "Release v${VERSION} already exists — skipping"
+
+  close_pull_request:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    steps:
+      - uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "close"
