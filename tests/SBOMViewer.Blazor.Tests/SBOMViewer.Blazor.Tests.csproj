@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\SBOMViewer.Blazor\SBOMViewer.Blazor.csproj" />
+    <ProjectReference Include="../../src/SBOMViewer.Blazor/SBOMViewer.Blazor.csproj" />
   </ItemGroup>
 
   <ItemGroup>
