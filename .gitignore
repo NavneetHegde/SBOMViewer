@@ -452,3 +452,6 @@ publish_output/
 
 # Logs and temporary files
 *.log
+
+# Generated SBOM (created during CI/CD)
+src/SBOMViewer.Blazor/wwwroot/sbomviewer_*.json
