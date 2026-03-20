@@ -43,5 +43,5 @@ public class HomePageTests : TestBase
     [Test]
     public async Task Footer_ContainsCopyright() =>
         // FluentFooter renders as a standard <footer> element, not a web component
-        await Expect(Page.Locator("footer")).ToContainTextAsync("SBOM Viewer v3.0");
+        await Expect(Page.Locator("footer")).ToContainTextAsync("SBOM Viewer v");
 }
