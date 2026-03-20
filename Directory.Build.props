@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup>
+    <!-- Single source of truth for the app version.
+         release-staging.yml increments the patch on every merge to release/*. -->
+    <Version>3.0.0</Version>
+  </PropertyGroup>
+</Project>
