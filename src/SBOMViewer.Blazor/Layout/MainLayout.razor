@@ -57,11 +57,12 @@
 
         <!-- Footer -->
         <FluentFooter Style="padding:0.5rem; display:flex; justify-content:center; align-items:center; gap:0.75rem; font-size:0.85rem; color:var(--neutral-foreground-2); border-top:1px solid var(--neutral-stroke-1); flex-shrink:0;">
-            <span>© @DateTime.Now.Year Licensed under the MIT License | SBOM Viewer v@(AppVersion)</span>
+            <span>© @DateTime.Now.Year Licensed under the MIT License</span>
+            <span>|</span>
+            <span>SBOM Viewer v@(AppVersion)</span>
             <span>|</span>
             <FluentAnchor Href="@($"sbomviewer_{AppVersion}.json")" Download="@($"sbomviewer_{AppVersion}.json")" Appearance="Appearance.Hypertext"
-                          IconStart="@(new Icons.Regular.Size16.ArrowDownload())"
-                          Class="no-icon-margin" Style="font-size:0.85rem;">SBOM
+                            Class="no-icon-margin" Style="font-size:0.85rem;">Download SBOM
             </FluentAnchor>
         </FluentFooter>
 

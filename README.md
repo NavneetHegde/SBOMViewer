@@ -12,6 +12,17 @@ SBOM Viewer is a web application built with Blazor WebAssembly that provides an 
 
 It loads data directly in the browser and presents it in a structured, hierarchical format—making it easy to analyze software components, licenses, and dependencies without additional tools.
 
+The app includes built-in **vulnerability scanning** powered by [OSV.dev](https://osv.dev) — scan all SBOM components for known CVEs directly in the browser with no backend required.
+
+## Features
+
+- **Dynamic SBOM viewer** — upload any supported SBOM JSON and the UI is generated dynamically from the file structure
+- **Auto-detect format** — automatically identifies CycloneDX or SPDX format and version
+- **Vulnerability scanning** — scan all components against the OSV.dev database for known CVEs, with severity ratings (Critical/High/Medium/Low), CVSS scores, and fix versions
+- **Searchable sections** — filter components, packages, and vulnerability results
+- **Accordion item counts** — each section shows the number of items as a badge
+- **Fully client-side** — all processing happens in the browser, no data leaves your machine
+
 ## Supported Formats
 
 | Format | Versions |
@@ -57,6 +68,7 @@ For the complete history of changes, see [CHANGELOG.md](./CHANGELOG.md).
 2. Select a `.json` file (max 20 MB) — the format is detected automatically.
 3. The data is parsed and displayed in a structured, searchable view.
 4. Navigate through accordion sections to explore components, dependencies, licenses, and more.
+5. Open the **Vulnerabilities** section and click **Scan for Vulnerabilities** to check all packages against the [OSV.dev](https://osv.dev) database — results show severity ratings, CVE IDs, and available fix versions.
 
 ### Sample Files
 
@@ -76,6 +88,7 @@ The [`samples/`](./samples/) folder contains ready-to-use SBOM files for testing
 - **Blazor WebAssembly** — client-side UI, no backend required
 - **C# / .NET 10** — application logic and JSON parsing (`System.Text.Json`)
 - **Fluent UI** (`Microsoft.FluentUI.AspNetCore.Components` v4.13.2) — modern UI components
+- **OSV.dev API** — open-source vulnerability database for client-side CVE scanning
 - **Azure Static Web Apps** — hosting and deployment
 
 ## Project Structure
@@ -84,9 +97,9 @@ The [`samples/`](./samples/) folder contains ready-to-use SBOM files for testing
 SBOMViewer.slnx
 ├── src/
 │   └── SBOMViewer.Blazor/          # Blazor WASM application
-│       ├── Components/             # UploadFile, DynamicSbomViewer, DynamicSection, DynamicObject
-│       ├── Models/                 # SbomFormat, SchemaNode
-│       ├── Services/               # SchemaService, SbomState, SbomFormatDetector
+│       ├── Components/             # UploadFile, DynamicSbomViewer, DynamicSection, DynamicObject, VulnerabilitySummary, VulnerabilityBadge
+│       ├── Models/                 # SbomFormat, SchemaNode, PackageInfo, VulnerabilityResult, ChatMessage
+│       ├── Services/               # SchemaService, SbomState, SbomFormatDetector, ChatState, PackageExtractor, VulnerabilityService
 │       ├── Pages/                  # Home page
 │       └── Layout/                 # MainLayout (header, toolbar, footer)
 ├── tests/

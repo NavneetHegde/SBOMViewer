@@ -1,5 +1,7 @@
 @page "/"
+@implements IDisposable
 @inject SbomState SbomState
+@inject ChatState ChatState
 
 <FluentStack Orientation="Orientation.Vertical" Style="gap:1.5rem;">
 
@@ -22,10 +24,12 @@
     protected override void OnInitialized()
     {
         SbomState.OnChange += StateHasChanged;
+        ChatState.OnChange += StateHasChanged;
     }
 
     public void Dispose()
     {
         SbomState.OnChange -= StateHasChanged;
+        ChatState.OnChange -= StateHasChanged;
     }
 }

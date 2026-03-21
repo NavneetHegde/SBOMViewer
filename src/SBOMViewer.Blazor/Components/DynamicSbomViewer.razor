@@ -1,6 +1,18 @@
 @using System.Text.Json
 @using Microsoft.FluentUI.AspNetCore.Components
 @using SBOMViewer.Blazor.Models
+@implements IDisposable
+@inject ChatState ChatState
+@inject VulnerabilityService VulnService
+@inject SbomState SbomState
+
+@if (ChatState.IsScanning)
+{
+    <div style="position:fixed; top:0; left:0; right:0; bottom:0; background-color:rgba(0,0,0,0.5); display:flex; flex-direction:column; justify-content:center; align-items:center; gap:1rem; z-index:1000;">
+        <FluentProgress Min="0" Max="100" Value="@_scanPercent" />
+        <span style="color:white; font-size:1rem;">Scanning for vulnerabilities... @ChatState.ScanProgress / @ChatState.ScanTotal</span>
+    </div>
+}
 
 @if (RootElement.ValueKind == JsonValueKind.Object)
 {
@@ -45,6 +57,103 @@
                     <FluentDivider />
                 }
 
+                // Vulnerability Scan accordion section
+                <FluentAccordionItem Expanded="@(_vulnExpanded)">
+                    <HeadingTemplate>
+                        <div style="display:flex; align-items:center; gap:0.5rem; width:100%;">
+                            <FluentIcon Value="@(new Icons.Regular.Size24.ShieldError())" Color="Color.Error" />
+                            <span>Vulnerabilities</span>
+                            @if (_totalVulns > 0)
+                            {
+                                <FluentBadge Appearance="Appearance.Accent"
+                                             BackgroundColor="#d32f2f" Color="white"
+                                             Style="font-size:0.75rem; font-weight:600;">
+                                    @_totalVulns
+                                </FluentBadge>
+                            }
+                            <span style="flex:1;"></span>
+                            <div style="position:relative; display:inline-flex; align-items:center;"
+                                 @onclick:stopPropagation="true"
+                                 @onmouseenter="ShowInfoPopover"
+                                 @onmouseleave="HideInfoPopover">
+                                <span style="cursor:help; display:inline-flex; align-items:center; opacity:0.6; transition:opacity 0.15s;">
+                                    <FluentIcon Value="@(new Icons.Regular.Size16.QuestionCircle())" />
+                                </span>
+                                @if (_showInfoPopover)
+                                {
+                                    <div style="position:absolute; top:calc(100% + 8px); right:0; z-index:1000;
+                                                background:var(--neutral-layer-floating); color:var(--neutral-foreground-rest);
+                                                border:1px solid var(--neutral-stroke-rest); border-radius:8px;
+                                                padding:0.85rem 1rem; min-width:300px; max-width:340px;
+                                                box-shadow:0 8px 24px rgba(0,0,0,0.18); font-size:0.85rem; line-height:1.5;
+                                                pointer-events:none;">
+                                        <div style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0.5rem; font-weight:600; font-size:0.9rem;">
+                                            <FluentIcon Value="@(new Icons.Regular.Size16.Info())" Color="Color.Accent" />
+                                            About Vulnerability Scanning
+                                        </div>
+                                        <p style="margin:0 0 0.4rem 0;">
+                                            Scans all components in this SBOM against the <strong>OSV.dev</strong> (Open Source Vulnerabilities) database.
+                                        </p>
+                                        <p style="margin:0; color:var(--neutral-foreground-hint); font-size:0.8rem;">
+                                            Results include severity ratings, CVE IDs, and available fix versions.
+                                        </p>
+                                    </div>
+                                }
+                            </div>
+                            <FluentButton Appearance="Appearance.Accent"
+                                          Size="ButtonSize.Small"
+                                          IconStart="@(ChatState.IsScanning ? new Icons.Regular.Size16.ArrowSync() : new Icons.Regular.Size16.ShieldTask())"
+                                          OnClick="@ScanVulnerabilities"
+                                          OnClick:stopPropagation="true"
+                                          Disabled="@ChatState.IsScanning"
+                                          Loading="@ChatState.IsScanning"
+                                          Title="Scan for known vulnerabilities"
+                                          Style="min-width:auto; font-weight:600;">
+                                @if (ChatState.IsScanning)
+                                {
+                                    @($"Scanning {ChatState.ScanProgress}/{ChatState.ScanTotal}...")
+                                }
+                                else
+                                {
+                                    @("Scan for Vulnerabilities")
+                                }
+                            </FluentButton>
+                        </div>
+                    </HeadingTemplate>
+                    <ChildContent>
+                        @if (ChatState.IsScanning)
+                        {
+                            <div style="padding:1rem; display:flex; flex-direction:column; align-items:center; gap:0.75rem;">
+                                <FluentProgress Min="0" Max="100" Value="@(_scanPercent)" />
+                                <span style="font-size:0.85rem; color:var(--neutral-foreground-hint);">
+                                    Scanning packages for vulnerabilities... @ChatState.ScanProgress / @ChatState.ScanTotal
+                                </span>
+                            </div>
+                        }
+                        <VulnerabilitySummary Results="@ChatState.VulnResults" />
+                        @if (ChatState.ScanError is not null)
+                        {
+                            <div style="padding:0.5rem;">
+                                <FluentBadge Appearance="Appearance.Lightweight" Color="Color.Error">@ChatState.ScanError</FluentBadge>
+                            </div>
+                        }
+                        @if (ChatState.VulnResults is null && !ChatState.IsScanning && ChatState.ScanError is null)
+                        {
+                            <div style="padding:1rem; text-align:center;">
+                                <div style="color:var(--neutral-foreground-hint); margin-bottom:0.5rem;">
+                                    No scan results yet.
+                                </div>
+                                <span style="font-size:0.8rem; color:var(--neutral-foreground-hint);">
+                                    Click <strong>Scan</strong> to check all packages against the
+                                    <FluentAnchor Href="https://osv.dev" Target="_blank" Appearance="Appearance.Hypertext">OSV.dev</FluentAnchor>
+                                    vulnerability database.
+                                </span>
+                            </div>
+                        }
+                    </ChildContent>
+                </FluentAccordionItem>
+                <FluentDivider />
+
                 // Group 2: Object/Array properties → individual accordion sections
                 var complexProps = GetPresentProperties(SchemaNodeType.Object, SchemaNodeType.Array);
 
@@ -59,7 +168,15 @@
                         <HeadingTemplate>
                             <div style="display:flex; align-items:center; gap:0.5rem;">
                                 <FluentIcon Value="@GetSectionIcon(propName)" />
-                                <span>@title @GetItemCount(val)</span>
+                                <span>@title</span>
+                                @if (val.ValueKind == JsonValueKind.Array)
+                                {
+                                    <FluentBadge Appearance="Appearance.Accent"
+                                                 BackgroundColor="var(--accent-fill-rest)" Color="white"
+                                                 Style="font-size:0.75rem; font-weight:600;">
+                                        @val.GetArrayLength()
+                                    </FluentBadge>
+                                }
                             </div>
                         </HeadingTemplate>
                         <ChildContent>
@@ -87,7 +204,15 @@
                         <HeadingTemplate>
                             <div style="display:flex; align-items:center; gap:0.5rem;">
                                 <FluentIcon Value="@(new Icons.Regular.Size24.List())" />
-                                <span>@HumanizePropertyName(prop.Name) @GetItemCount(prop.Value)</span>
+                                <span>@HumanizePropertyName(prop.Name)</span>
+                                @if (prop.Value.ValueKind == JsonValueKind.Array)
+                                {
+                                    <FluentBadge Appearance="Appearance.Accent"
+                                                 BackgroundColor="var(--accent-fill-rest)" Color="white"
+                                                 Style="font-size:0.75rem; font-weight:600;">
+                                        @prop.Value.GetArrayLength()
+                                    </FluentBadge>
+                                }
                             </div>
                         </HeadingTemplate>
                         <ChildContent>
@@ -105,6 +230,82 @@
     [Parameter] public JsonElement RootElement { get; set; }
     [Parameter] public SchemaNode Schema { get; set; } = default!;
     [Parameter] public string? FileName { get; set; }
+
+    private bool _vulnExpanded;
+    private bool _showInfoPopover;
+    private int _totalVulns;
+
+    private int _scanPercent => ChatState.ScanTotal > 0
+        ? (int)(ChatState.ScanProgress * 100.0 / ChatState.ScanTotal)
+        : 0;
+
+    protected override void OnInitialized()
+    {
+        ChatState.OnChange += OnChatStateChanged;
+    }
+
+    public void Dispose()
+    {
+        ChatState.OnChange -= OnChatStateChanged;
+    }
+
+    private void OnChatStateChanged()
+    {
+        _totalVulns = ChatState.VulnResults?.Sum(r => r.Vulnerabilities.Count) ?? 0;
+        if (ChatState.VulnResults is null)
+            _vulnExpanded = false;
+        StateHasChanged();
+    }
+
+    private void ShowInfoPopover() => _showInfoPopover = true;
+    private void HideInfoPopover() => _showInfoPopover = false;
+
+
+    private async Task ScanVulnerabilities()
+    {
+        if (SbomState.DetectedFormat is null)
+            return;
+
+        ChatState.IsScanning = true;
+        ChatState.ScanError = null;
+        _vulnExpanded = true;
+        ChatState.NotifyStateChanged();
+
+        try
+        {
+            var packages = PackageExtractor.ExtractPackages(
+                RootElement, SbomState.DetectedFormat.Value);
+
+            if (packages.Count == 0)
+            {
+                ChatState.ScanError = "No packages found in this SBOM to scan.";
+                ChatState.IsScanning = false;
+                ChatState.NotifyStateChanged();
+                return;
+            }
+
+            ChatState.ScanTotal = packages.Count;
+
+            var results = await VulnService.ScanAsync(packages, (done, total) =>
+            {
+                ChatState.ScanProgress = done;
+                ChatState.NotifyStateChanged();
+                InvokeAsync(StateHasChanged);
+            });
+
+            ChatState.VulnResults = results;
+            _totalVulns = results.Sum(r => r.Vulnerabilities.Count);
+        }
+        catch (Exception ex)
+        {
+            ChatState.ScanError = $"Scan failed: {ex.Message}";
+        }
+        finally
+        {
+            ChatState.IsScanning = false;
+            ChatState.NotifyStateChanged();
+        }
+    }
 
     /// <summary>
     /// Returns schema-ordered property names that exist in the JSON and match the given node types.
@@ -154,11 +355,6 @@
         _ => el.GetRawText()
     };
 
-    private static string GetItemCount(JsonElement el) => el.ValueKind switch
-    {
-        JsonValueKind.Array => $"| {el.GetArrayLength()}",
-        _ => ""
-    };
 
     private static string HumanizePropertyName(string name)
     {
