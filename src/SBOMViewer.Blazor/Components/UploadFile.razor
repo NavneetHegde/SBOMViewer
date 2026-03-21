@@ -1,6 +1,7 @@
 @using System.Text.Json
 @inject SbomState SbomState
 @inject SchemaService SchemaService
+@inject ChatState ChatState
 
 <!-- Container -->
 <FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center" Style="max-width:800px; margin:auto; padding:1rem; gap:0.5rem;">
@@ -63,6 +64,7 @@
 
         isLoading = true;
         errorMessage = null;
+        ChatState.ClearVulnerabilities();
         StateHasChanged();
 
         foreach (var file in files)

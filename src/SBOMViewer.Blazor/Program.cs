@@ -9,6 +9,9 @@ builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 builder.Services.AddSingleton<SbomState>();
 builder.Services.AddSingleton<SchemaService>();
+builder.Services.AddSingleton<ChatState>();
+builder.Services.AddScoped(sp => new HttpClient());
+builder.Services.AddScoped<VulnerabilityService>();
 builder.Services.AddFluentUIComponents();
 
 await builder.Build().RunAsync();
