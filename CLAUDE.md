@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 SBOM Viewer is a Blazor WebAssembly (WASM) client-side app that dynamically parses and displays SPDX 2.2, CycloneDX 1.6, and CycloneDX 1.7 SBOM JSON files in the browser. The UI is generated dynamically from the uploaded JSON structure — no static model classes or hardcoded viewers. All processing happens client-side — there is no backend API. Deployed as an Azure Static Web App at sbomviewer.com.
 
+The app includes a **vulnerability scanning** feature that checks all SBOM components against the [OSV.dev](https://osv.dev) (Open Source Vulnerabilities) database. Scanning is user-initiated and runs entirely client-side via the OSV.dev batch API.
+
 ## Build & Run Commands
 
 ```bash
@@ -57,16 +59,24 @@ SBOMViewer.slnx
 │       │   └── Home.razor              # Main page — renders DynamicSbomViewer based on SbomState
 │       ├── Components/
 │       │   ├── UploadFile.razor        # File upload, format detection, validation, JSON parsing
-│       │   ├── DynamicSbomViewer.razor # Top-level viewer — FluentCard + FluentAccordion sections
+│       │   ├── DynamicSbomViewer.razor # Top-level viewer — FluentCard + FluentAccordion sections + vuln scan
 │       │   ├── DynamicSection.razor    # Array/object renderer — search, scroll, details/summary
-│       │   └── DynamicObject.razor     # Recursive object renderer — key-value, badges, nested
+│       │   ├── DynamicObject.razor     # Recursive object renderer — key-value, badges, nested
+│       │   ├── VulnerabilitySummary.razor  # Severity breakdown, searchable affected-package list
+│       │   └── VulnerabilityBadge.razor    # Colored severity badge (Critical/High/Medium/Low)
 │       ├── Services/
 │       │   ├── SbomState.cs            # Singleton state: JsonDocument, SchemaNode, format, filename
 │       │   ├── SbomFormatDetector.cs   # Format detection + lightweight required-field validation
-│       │   └── SchemaService.cs        # Builds SchemaNode tree from uploaded JSON, applies render hints
+│       │   ├── SchemaService.cs        # Builds SchemaNode tree from uploaded JSON, applies render hints
+│       │   ├── ChatState.cs            # Singleton state: vuln results, scan progress, chat messages
+│       │   ├── PackageExtractor.cs     # Extracts packages from SBOM JSON (CycloneDX + SPDX)
+│       │   └── VulnerabilityService.cs # OSV.dev batch API client for vulnerability scanning
 │       ├── Models/
 │       │   ├── SbomFormat.cs           # Enum: CycloneDX_1_6, CycloneDX_1_7, SPDX_2_2
-│       │   └── SchemaNode.cs           # SchemaNode, SchemaNodeType, RenderHint
+│       │   ├── SchemaNode.cs           # SchemaNode, SchemaNodeType, RenderHint
+│       │   ├── PackageInfo.cs          # Package name, version, ecosystem, purl
+│       │   ├── VulnerabilityResult.cs  # CVE entries per package
+│       │   └── ChatMessage.cs          # Chat message (role, content, timestamp)
 │       └── wwwroot/
 │           ├── index.html              # Host page (SEO meta, Google Analytics, Fluent theme loader)
 │           ├── robots.txt              # Search engine crawl rules
@@ -79,7 +89,10 @@ SBOMViewer.slnx
     │   └── Services/
     │       ├── SbomStateTests.cs       # SbomState event and persistence tests
     │       ├── SbomFormatDetectorTests.cs  # Format detection + lightweight validation tests
-    │       └── SchemaServiceTests.cs   # SchemaNode building and render hint tests
+    │       ├── SchemaServiceTests.cs   # SchemaNode building and render hint tests
+    │       ├── ChatStateTests.cs       # ChatState event, clear, and vuln state tests
+    │       ├── PackageExtractorTests.cs    # Package extraction from CycloneDX + SPDX
+    │       └── VulnerabilityServiceTests.cs # OSV.dev API client tests
     └── SBOMViewer.E2E.Tests/
         ├── PlaywrightSetup.cs          # One-time Chromium install ([SetUpFixture])
         ├── TestBase.cs                 # PageTest base — reads BASE_URL env var, waits for Blazor bootstrap
@@ -109,6 +122,7 @@ The app version lives in `Directory.Build.props` at the repo root and is inherit
 5. **SchemaService.BuildFromJson** — builds a `SchemaNode` tree from the JSON structure, applies render hints
 6. **SbomState** — singleton holding `JsonDocument`, `SchemaNode`, detected format, and filename; notifies subscribers via `OnChange`
 7. **DynamicSbomViewer** → **DynamicSection** → **DynamicObject** — recursive components that walk `JsonElement` + `SchemaNode` to render Fluent UI
+8. **Vulnerability scan** (user-initiated) — **PackageExtractor** extracts packages → **VulnerabilityService** queries OSV.dev batch API → **ChatState** stores results → **VulnerabilitySummary** renders severity breakdown and affected packages
 
 ### Dynamic Rendering Pipeline
 
@@ -118,12 +132,27 @@ The UI is generated dynamically from the uploaded JSON — no static C# model cl
 - **DynamicSection** — renders arrays with `FluentSearch` filtering (>5 items), scrollable container, `<details>/<summary>` per item with indented content and left border
 - **DynamicObject** — renders object properties recursively: key-value pairs for scalars, `FluentBadge` for tag-like string arrays, indented nested objects with border, delegates to `DynamicSection` for object arrays
 
+### Vulnerability Scanning
+
+User-initiated vulnerability scanning via the [OSV.dev](https://osv.dev) batch API — all processing is client-side:
+
+- **PackageExtractor** — extracts `PackageInfo` (name, version, ecosystem, purl) from the SBOM JSON. CycloneDX uses the `components` array + purl; SPDX uses the `packages` array + `externalRefs`
+- **VulnerabilityService** — batches packages in groups of 100, POSTs to `https://api.osv.dev/v1/querybatch`, parses responses into `VulnerabilityResult` with severity, CVSS score, and fix version
+- **ChatState** — singleton holding scan results, progress, and error state. `ClearVulnerabilities()` is called on new file upload to reset stale data
+- **DynamicSbomViewer** — Vulnerabilities accordion section with "Scan for Vulnerabilities" button, progress overlay, count badge, and hover info popover explaining the OSV.dev integration
+- **VulnerabilitySummary** — severity breakdown badges (Critical/High/Medium/Low/Unknown), searchable list of affected packages, expandable CVE details with links to OSV.dev
+- **VulnerabilityBadge** — colored badge component used for severity counts
+
 ### Key Models
 
 - `SchemaNode` — lightweight tree built from JSON data: `PropertyName`, `Title`, `NodeType`, `Properties` dict, `PropertyOrder`, `ItemSchema` (for arrays), `RenderHint`
 - `SchemaNodeType` enum — String, Integer, Number, Boolean, Array, Object, Unknown
 - `RenderHint` enum — Auto, AccordionSection, SearchableList, BadgeList, KeyValueGroup
 - `SbomFormat` enum — CycloneDX_1_6, CycloneDX_1_7, SPDX_2_2
+- `PackageInfo` record — Name, Version, Ecosystem, Purl
+- `VulnerabilityResult` record — PackageName, PackageVersion, list of `VulnerabilityEntry`
+- `VulnerabilityEntry` record — Id, Summary, Severity, CvssScore, FixedVersion
+- `ChatMessage` record — Role, Content, Timestamp
 
 ### Lightweight Validation
 
@@ -156,6 +185,8 @@ Uses **Microsoft.FluentUI.AspNetCore.Components** (v4.13.2) for all UI component
 - **UI components**: Use Fluent UI (`FluentCard`, `FluentAccordion`, `FluentSearch`, `FluentBadge`, etc.). Reference icons via the `Icons` alias from `_Imports.razor`.
 - **Dynamic rendering**: All three viewer components (`DynamicSbomViewer`, `DynamicSection`, `DynamicObject`) work with `JsonElement` + `SchemaNode` — no format-specific logic.
 - **File uploads**: Max 20MB, `.json` only. Auto-detects format from JSON content.
+- **Vulnerability scanning**: User-initiated via OSV.dev batch API. `PackageExtractor` extracts packages, `VulnerabilityService` queries OSV.dev, results stored in `ChatState`. Vulnerability data is cleared on new file upload via `ChatState.ClearVulnerabilities()`.
+- **Accordion item counts**: Array sections show item count as a `FluentBadge` with accent fill. Vulnerabilities section shows count with red badge (`#d32f2f`).
 - **E2E tests**: Use NUnit + Playwright (`PageTest` base class). Tests are black-box — no project reference to `SBOMViewer.Blazor`. Target URL is controlled via `BASE_URL` env var (default `http://localhost:5000`).
 
 ## Adding a New SBOM Format

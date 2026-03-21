@@ -75,10 +75,34 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          gh release create "v${VERSION}" \
-            --title "v${VERSION}" \
-            --notes "Deployed to [sbomviewer.com](https://sbomviewer.com) from commit ${{ github.sha }}." \
-            --latest 2>/dev/null || echo "Release v${VERSION} already exists — skipping"
+          TAG="v${VERSION}"
+
+          # Find previous release tag for changelog range
+          PREV_TAG=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo "")
+
+          # Build release notes: deployment info + auto-generated changelog & contributors
+          NOTES="Deployed to [sbomviewer.com](https://sbomviewer.com) from commit ${{ github.sha }}."
+          if [ -n "$PREV_TAG" ]; then
+            AUTO_NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \
+              -f tag_name="$TAG" \
+              -f target_commitish="${{ github.sha }}" \
+              -f previous_tag_name="$PREV_TAG" \
+              --jq '.body' 2>/dev/null || echo "")
+          else
+            AUTO_NOTES=$(gh api repos/${{ github.repository }}/releases/generate-notes \
+              -f tag_name="$TAG" \
+              -f target_commitish="${{ github.sha }}" \
+              --jq '.body' 2>/dev/null || echo "")
+          fi
+
+          if [ -n "$AUTO_NOTES" ]; then
+            NOTES="$NOTES"$'\n\n'"$AUTO_NOTES"
+          fi
+
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes "$NOTES" \
+            --latest 2>/dev/null || echo "Release $TAG already exists — skipping"
 
   close_pull_request:
     runs-on: ubuntu-latest
