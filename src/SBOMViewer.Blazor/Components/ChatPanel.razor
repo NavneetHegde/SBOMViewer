@@ -1,0 +1,256 @@
+@inject ChatState ChatState
+@inject WebLlmService WebLlmService
+
+@implements IDisposable
+
+<div class="chat-panel">
+    <!-- Header -->
+    <div class="chat-header">
+        <FluentIcon Value="@(new Icons.Regular.Size20.Chat())" />
+        <span class="chat-title">AI Chat</span>
+        <FluentBadge Appearance="Appearance.Lightweight" Color="var(--warning)">Beta</FluentBadge>
+        <FluentButton Appearance="Appearance.Stealth"
+                      IconStart="@(new Icons.Regular.Size20.Dismiss())"
+                      Title="Close chat"
+                      OnClick="ClosePanel" />
+    </div>
+
+    @if (ChatState.IsLlmLoaded)
+    {
+        <!-- Pinned model info -->
+        <div class="model-info-bar">
+            <FluentIcon Value="@(new Icons.Regular.Size20.BrainCircuit())" Style="flex-shrink:0;" />
+            <div class="model-info-details">
+                <span class="model-info-name">@WebLlmService.ModelId</span>
+                <span class="model-info-meta">
+                    @WebLlmService.ModelSize &middot; @WebLlmService.ModelLicense &middot; Runs locally in browser
+                </span>
+            </div>
+        </div>
+    }
+
+    <!-- Messages area -->
+    <div class="chat-messages" @ref="_messagesContainer">
+        @if (!_isWebGpuSupported)
+        {
+            <FluentMessageBar Title="WebGPU Not Supported" Intent="@MessageIntent.Warning" AllowDismiss="false">
+                AI Chat requires a browser with WebGPU support (Chrome 113+, Edge 113+).
+                Your current browser does not support WebGPU.
+            </FluentMessageBar>
+        }
+        else if (!ChatState.IsLlmLoaded && !ChatState.IsLlmLoading)
+        {
+            <!-- Model opt-in card -->
+            <div class="model-optin-card">
+                <FluentIcon Value="@(new Icons.Regular.Size24.BrainCircuit())" />
+                <h3>AI-Powered SBOM Analysis</h3>
+                @if (_isModelCached)
+                {
+                    <p>
+                        The AI model is already cached in your browser. Click below to load it into memory.
+                        <strong>No data leaves your browser.</strong>
+                    </p>
+                    <FluentButton Appearance="Appearance.Accent"
+                                  IconStart="@(new Icons.Regular.Size20.Play())"
+                                  OnClick="DownloadModel">
+                        Load AI Model
+                    </FluentButton>
+                }
+                else
+                {
+                    <p>
+                        AI Chat is powered by
+                        <FluentAnchor Href="https://github.com/mlc-ai/web-llm" Target="_blank" Appearance="Appearance.Hypertext">WebLLM</FluentAnchor>
+                        (<FluentAnchor Href="https://github.com/mlc-ai/web-llm/blob/main/LICENSE" Target="_blank" Appearance="Appearance.Hypertext">Apache 2.0 license</FluentAnchor>).
+                    </p>
+                    <p>
+                        The model (~924 MB) will be downloaded to your browser and runs entirely on your device.
+                        <strong>No data leaves your browser.</strong>
+                    </p>
+                    <FluentButton Appearance="Appearance.Accent"
+                                  IconStart="@(new Icons.Regular.Size20.ArrowDownload())"
+                                  OnClick="DownloadModel">
+                        Download AI Model
+                    </FluentButton>
+                }
+                <p class="beta-notice">This feature is in beta and actively evolving. Responses may not always be accurate.</p>
+            </div>
+        }
+        else if (ChatState.IsLlmLoading)
+        {
+            <!-- Download/load progress -->
+            <div class="model-loading">
+                <p>@(_isModelCached ? "Loading AI model..." : "Downloading AI model...")</p>
+                <FluentProgress Min="0" Max="100" Value="@((int)(ChatState.LlmLoadProgress * 100))" />
+                <span class="progress-text">@((ChatState.LlmLoadProgress * 100).ToString("F0"))%</span>
+            </div>
+        }
+
+        @if (ChatState.LlmError is not null)
+        {
+            <FluentMessageBar Title="Error" Intent="@MessageIntent.Error" AllowDismiss="false">
+                @ChatState.LlmError
+            </FluentMessageBar>
+        }
+
+        @if (ChatState.IsLlmLoaded && ChatState.Messages.Count == 0)
+        {
+            <div class="sample-prompts">
+                <span class="sample-prompts-label">Try asking:</span>
+                <div class="sample-prompts-grid">
+                    @foreach (var prompt in _samplePrompts)
+                    {
+                        <button class="sample-prompt-chip" @onclick="() => SendSamplePrompt(prompt)">@prompt</button>
+                    }
+                </div>
+            </div>
+        }
+
+        @foreach (var message in ChatState.Messages)
+        {
+            <div class="chat-bubble @(message.Role == "user" ? "user-bubble" : "assistant-bubble")">
+                <div class="bubble-content">@message.Content</div>
+                <div class="bubble-time">@message.Timestamp.ToString("HH:mm")</div>
+            </div>
+        }
+
+        @if (_isWaitingForReply)
+        {
+            <div class="chat-bubble assistant-bubble">
+                @if (!string.IsNullOrEmpty(ChatState.StreamingContent))
+                {
+                    <div class="bubble-content">@ChatState.StreamingContent</div>
+                }
+                else
+                {
+                    <div class="bubble-content typing-indicator">
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                        <span class="dot"></span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- Input area -->
+    <div class="chat-input-area">
+        <FluentTextField @bind-Value="_userInput"
+                         Placeholder="Ask about your SBOM..."
+                         Disabled="@(!ChatState.IsLlmLoaded || !_isWebGpuSupported)"
+                         Style="flex:1;"
+                         @onkeydown="HandleKeyDown" />
+        <FluentButton Appearance="Appearance.Accent"
+                      IconStart="@(new Icons.Regular.Size20.Send())"
+                      Title="Send"
+                      Disabled="@(!ChatState.IsLlmLoaded || string.IsNullOrWhiteSpace(_userInput) || _isWaitingForReply)"
+                      OnClick="SendMessage" />
+    </div>
+    @if (_isWaitingForReply)
+    {
+        <div class="cancel-hint">Press Esc to cancel</div>
+    }
+</div>
+
+@code {
+    private static readonly string[] _samplePrompts =
+    [
+        "Summarize this SBOM",
+        "List the most important packages",
+        "What ecosystems are represented?",
+        "Which packages have critical vulnerabilities?",
+        "What licenses are used?",
+        "What should I fix first based on vulnerabilities?",
+    ];
+
+    private string? _userInput;
+    private bool _isWebGpuSupported = true;
+    private bool _isModelCached;
+    private bool _isWaitingForReply;
+    private ElementReference _messagesContainer;
+
+    protected override void OnInitialized()
+    {
+        ChatState.OnChange += StateHasChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _isWebGpuSupported = await WebLlmService.IsWebGpuSupportedAsync();
+            if (_isWebGpuSupported)
+            {
+                _isModelCached = await WebLlmService.IsModelCachedAsync();
+            }
+            StateHasChanged();
+        }
+    }
+
+    private void ClosePanel()
+    {
+        ChatState.IsChatPanelOpen = false;
+        ChatState.NotifyStateChanged();
+    }
+
+    private async Task DownloadModel()
+    {
+        await WebLlmService.InitializeAsync();
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_userInput) || !ChatState.IsLlmLoaded || _isWaitingForReply)
+            return;
+
+        var userMessage = new ChatMessage("user", _userInput.Trim(), DateTime.Now);
+        ChatState.AddMessage(userMessage);
+        _userInput = string.Empty;
+        _isWaitingForReply = true;
+        StateHasChanged();
+        await WebLlmService.StartEscapeListenerAsync();
+
+        try
+        {
+            var reply = await WebLlmService.GetCompletionAsync(ChatState.Messages);
+            ChatState.StreamingContent = null;
+            var assistantMessage = new ChatMessage("assistant", reply, DateTime.Now);
+            ChatState.AddMessage(assistantMessage);
+        }
+        catch (OperationCanceledException)
+        {
+            ChatState.StreamingContent = null;
+            ChatState.NotifyStateChanged();
+        }
+        catch (Exception ex)
+        {
+            ChatState.StreamingContent = null;
+            ChatState.LlmError = $"Chat error: {ex.Message}";
+            ChatState.NotifyStateChanged();
+        }
+        finally
+        {
+            _isWaitingForReply = false;
+            await WebLlmService.StopEscapeListenerAsync();
+        }
+    }
+
+    private async Task SendSamplePrompt(string prompt)
+    {
+        _userInput = prompt;
+        await SendMessage();
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessage();
+        }
+    }
+
+    public void Dispose()
+    {
+        ChatState.OnChange -= StateHasChanged;
+    }
+}
