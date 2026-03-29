@@ -92,7 +92,7 @@
                                             About Vulnerability Scanning
                                         </div>
                                         <p style="margin:0 0 0.4rem 0;">
-                                            Scans all components in this SBOM against the <strong>OSV.dev</strong> (Open Source Vulnerabilities) database.
+                                            Scans up to <strong>500 components</strong> in this SBOM against the <strong>OSV.dev</strong> (Open Source Vulnerabilities) database.
                                         </p>
                                         <p style="margin:0; color:var(--neutral-foreground-hint); font-size:0.8rem;">
                                             Results include severity ratings, CVE IDs, and available fix versions.
@@ -135,6 +135,13 @@
                         {
                             <div style="padding:0.5rem;">
                                 <FluentBadge Appearance="Appearance.Lightweight" Color="Color.Error">@ChatState.ScanError</FluentBadge>
+                            </div>
+                        }
+                        @foreach (var warning in ChatState.ScanWarnings)
+                        {
+                            <div style="padding:0.4rem 0.5rem; display:flex; align-items:center; gap:0.4rem; font-size:0.82rem; color:var(--warning-foreground, #b45309);">
+                                <FluentIcon Value="@(new Icons.Regular.Size16.Warning())" />
+                                @warning
                             </div>
                         }
                         @if (ChatState.VulnResults is null && !ChatState.IsScanning && ChatState.ScanError is null)
@@ -286,12 +293,20 @@
 
             ChatState.ScanTotal = packages.Count;
 
-            var results = await VulnService.ScanAsync(packages, (done, total) =>
-            {
-                ChatState.ScanProgress = done;
-                ChatState.NotifyStateChanged();
-                InvokeAsync(StateHasChanged);
-            });
+            var results = await VulnService.ScanAsync(
+                packages,
+                onProgress: (done, total) =>
+                {
+                    ChatState.ScanProgress = done;
+                    ChatState.ScanTotal = total;
+                    ChatState.NotifyStateChanged();
+                    InvokeAsync(StateHasChanged);
+                },
+                onWarning: msg =>
+                {
+                    ChatState.ScanWarnings.Add(msg);
+                    ChatState.NotifyStateChanged();
+                });
 
             ChatState.VulnResults = results;
             _totalVulns = results.Sum(r => r.Vulnerabilities.Count);
