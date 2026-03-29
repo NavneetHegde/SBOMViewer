@@ -48,6 +48,7 @@ public class ChatStateTests
         state.ScanProgress = 5;
         state.ScanTotal = 10;
         state.ScanError = "error";
+        state.ScanWarnings.Add("some warning");
 
         state.ClearVulnerabilities();
 
@@ -56,6 +57,7 @@ public class ChatStateTests
         state.ScanProgress.Should().Be(0);
         state.ScanTotal.Should().Be(0);
         state.ScanError.Should().BeNull();
+        state.ScanWarnings.Should().BeEmpty();
     }
 
     [Fact]
@@ -67,6 +69,7 @@ public class ChatStateTests
         state.IsChatPanelOpen = true;
         state.VulnResults = [new VulnerabilityResult("pkg", "1.0", [])];
         state.IsScanning = true;
+        state.ScanWarnings.Add("some warning");
 
         state.Clear();
 
@@ -75,6 +78,7 @@ public class ChatStateTests
         state.IsChatPanelOpen.Should().BeFalse();
         state.VulnResults.Should().BeNull();
         state.IsScanning.Should().BeFalse();
+        state.ScanWarnings.Should().BeEmpty();
     }
 
     [Fact]

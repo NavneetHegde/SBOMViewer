@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 SBOM Viewer is a Blazor WebAssembly (WASM) client-side app that dynamically parses and displays SPDX 2.2, CycloneDX 1.6, and CycloneDX 1.7 SBOM JSON files in the browser. The UI is generated dynamically from the uploaded JSON structure — no static model classes or hardcoded viewers. All processing happens client-side — there is no backend API. Deployed as an Azure Static Web App at sbomviewer.com.
 
-The app includes a **vulnerability scanning** feature that checks all SBOM components against the [OSV.dev](https://osv.dev) (Open Source Vulnerabilities) database. Scanning is user-initiated and runs entirely client-side via the OSV.dev batch API.
+The app includes a **vulnerability scanning** feature that checks all SBOM components against the [OSV.dev](https://osv.dev) (Open Source Vulnerabilities) database. Scanning is user-initiated and runs entirely client-side via the OSV.dev batch and detail APIs.
 
 ## Build & Run Commands
 
@@ -68,9 +68,9 @@ SBOMViewer.slnx
 │       │   ├── SbomState.cs            # Singleton state: JsonDocument, SchemaNode, format, filename
 │       │   ├── SbomFormatDetector.cs   # Format detection + lightweight required-field validation
 │       │   ├── SchemaService.cs        # Builds SchemaNode tree from uploaded JSON, applies render hints
-│       │   ├── ChatState.cs            # Singleton state: vuln results, scan progress, chat messages
+│       │   ├── ChatState.cs            # Singleton state: vuln results, scan progress, warnings, chat messages
 │       │   ├── PackageExtractor.cs     # Extracts packages from SBOM JSON (CycloneDX + SPDX)
-│       │   └── VulnerabilityService.cs # OSV.dev batch API client for vulnerability scanning
+│       │   └── VulnerabilityService.cs # OSV.dev two-phase scan: batch query + per-vuln detail fetch
 │       ├── Models/
 │       │   ├── SbomFormat.cs           # Enum: CycloneDX_1_6, CycloneDX_1_7, SPDX_2_2
 │       │   ├── SchemaNode.cs           # SchemaNode, SchemaNodeType, RenderHint
@@ -122,7 +122,7 @@ The app version lives in `Directory.Build.props` at the repo root and is inherit
 5. **SchemaService.BuildFromJson** — builds a `SchemaNode` tree from the JSON structure, applies render hints
 6. **SbomState** — singleton holding `JsonDocument`, `SchemaNode`, detected format, and filename; notifies subscribers via `OnChange`
 7. **DynamicSbomViewer** → **DynamicSection** → **DynamicObject** — recursive components that walk `JsonElement` + `SchemaNode` to render Fluent UI
-8. **Vulnerability scan** (user-initiated) — **PackageExtractor** extracts packages → **VulnerabilityService** queries OSV.dev batch API → **ChatState** stores results → **VulnerabilitySummary** renders severity breakdown and affected packages
+8. **Vulnerability scan** (user-initiated) — **PackageExtractor** extracts packages → **VulnerabilityService** queries OSV.dev in two phases (batch to collect IDs, then per-vuln detail fetch) → **ChatState** stores results → **VulnerabilitySummary** renders severity breakdown and affected packages
 
 ### Dynamic Rendering Pipeline
 
@@ -134,14 +134,18 @@ The UI is generated dynamically from the uploaded JSON — no static C# model cl
 
 ### Vulnerability Scanning
 
-User-initiated vulnerability scanning via the [OSV.dev](https://osv.dev) batch API — all processing is client-side:
+User-initiated vulnerability scanning via the [OSV.dev](https://osv.dev) API — all processing is client-side:
 
 - **PackageExtractor** — extracts `PackageInfo` (name, version, ecosystem, purl) from the SBOM JSON. CycloneDX uses the `components` array + purl; SPDX uses the `packages` array + `externalRefs`
-- **VulnerabilityService** — batches packages in groups of 100, POSTs to `https://api.osv.dev/v1/querybatch`, parses responses into `VulnerabilityResult` with severity, CVSS score, and fix version
-- **ChatState** — singleton holding scan results, progress, and error state. `ClearVulnerabilities()` is called on new file upload to reset stale data
-- **DynamicSbomViewer** — Vulnerabilities accordion section with "Scan for Vulnerabilities" button, progress overlay, count badge, and hover info popover explaining the OSV.dev integration
-- **VulnerabilitySummary** — severity breakdown badges (Critical/High/Medium/Low/Unknown), searchable list of affected packages, expandable CVE details with links to OSV.dev
-- **VulnerabilityBadge** — colored badge component used for severity counts
+- **VulnerabilityService** — two-phase scan:
+  - **Phase 1**: batches packages in groups of 100, POSTs to `https://api.osv.dev/v1/querybatch` to collect vuln IDs per package
+  - **Phase 2**: fetches full details for each unique vuln ID via `GET https://api.osv.dev/v1/vulns/{id}` (up to 5 concurrent requests), parses complete severity, CVSS score, summary, and fix version
+  - Hard caps prevent abuse: max **500 packages** scanned, max **200 unique vuln detail fetches** per scan. Exceeding either cap fires `onWarning` and surfaces a warning banner in the UI
+  - Severity is resolved in priority order: `database_specific.severity` → `database_specific.cvss.score` → `ecosystem_specific.severity` → `severity[].score`. `"MODERATE"` (GitHub Advisory DB) is normalised to `"MEDIUM"`
+- **ChatState** — singleton holding scan results, progress, warnings, and error state. `ClearVulnerabilities()` is called on new file upload to reset stale data. `ScanWarnings` accumulates non-fatal cap/truncation notices
+- **DynamicSbomViewer** — Vulnerabilities accordion section with "Scan for Vulnerabilities" button, progress overlay (tracks vuln detail fetches), count badge, warning banners, and hover info popover
+- **VulnerabilitySummary** — top-level severity breakdown badges, searchable list of affected packages with per-severity badge breakdown per package (not a single combined badge), expandable CVE details with links to OSV.dev
+- **VulnerabilityBadge** — colored severity badge; MEDIUM uses dark text (`#1a1a1a`) on amber background for legibility
 
 ### Key Models
 
@@ -185,7 +189,7 @@ Uses **Microsoft.FluentUI.AspNetCore.Components** (v4.13.2) for all UI component
 - **UI components**: Use Fluent UI (`FluentCard`, `FluentAccordion`, `FluentSearch`, `FluentBadge`, etc.). Reference icons via the `Icons` alias from `_Imports.razor`.
 - **Dynamic rendering**: All three viewer components (`DynamicSbomViewer`, `DynamicSection`, `DynamicObject`) work with `JsonElement` + `SchemaNode` — no format-specific logic.
 - **File uploads**: Max 20MB, `.json` only. Auto-detects format from JSON content.
-- **Vulnerability scanning**: User-initiated via OSV.dev batch API. `PackageExtractor` extracts packages, `VulnerabilityService` queries OSV.dev, results stored in `ChatState`. Vulnerability data is cleared on new file upload via `ChatState.ClearVulnerabilities()`.
+- **Vulnerability scanning**: User-initiated two-phase scan. Phase 1: `POST /v1/querybatch` collects vuln IDs per package. Phase 2: `GET /v1/vulns/{id}` fetches full details for each unique ID (max 5 concurrent). Hard caps: 500 packages, 200 vuln detail fetches. Results and warnings stored in `ChatState`. Cleared on new file upload via `ChatState.ClearVulnerabilities()`.
 - **Accordion item counts**: Array sections show item count as a `FluentBadge` with accent fill. Vulnerabilities section shows count with red badge (`#d32f2f`).
 - **E2E tests**: Use NUnit + Playwright (`PageTest` base class). Tests are black-box — no project reference to `SBOMViewer.Blazor`. Target URL is controlled via `BASE_URL` env var (default `http://localhost:5000`).
 
