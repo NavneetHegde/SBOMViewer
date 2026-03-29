@@ -20,6 +20,7 @@ public class ChatState
     public int ScanProgress { get; set; }
     public int ScanTotal { get; set; }
     public string? ScanError { get; set; }
+    public List<string> ScanWarnings { get; } = [];
 
     public void AddMessage(ChatMessage message)
     {
@@ -44,6 +45,7 @@ public class ChatState
         ScanProgress = 0;
         ScanTotal = 0;
         ScanError = null;
+        ScanWarnings.Clear();
         NotifyStateChanged();
     }
 
@@ -60,6 +62,7 @@ public class ChatState
         ScanProgress = 0;
         ScanTotal = 0;
         ScanError = null;
+        ScanWarnings.Clear();
         NotifyStateChanged();
     }
 
