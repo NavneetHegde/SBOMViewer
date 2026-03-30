@@ -12,6 +12,7 @@ builder.Services.AddSingleton<SchemaService>();
 builder.Services.AddSingleton<ChatState>();
 builder.Services.AddScoped(sp => new HttpClient());
 builder.Services.AddScoped<VulnerabilityService>();
+builder.Services.AddScoped<WebLlmService>();
 builder.Services.AddFluentUIComponents();
 
 await builder.Build().RunAsync();

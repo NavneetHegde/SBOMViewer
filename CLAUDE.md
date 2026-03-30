@@ -40,10 +40,10 @@ SBOMViewer.slnx
 ├── CLAUDE.md
 ├── AGENTS.md
 ├── Infra/
-│   └── main.bicep                      # Azure Static Web App infrastructure
+│   └── main.bicep                      # Azure Static Web Apps infrastructure (production + staging)
 ├── .github/workflows/
 │   ├── ci.yml                          # PR validation: build + unit tests + E2E
-│   ├── release-staging.yml             # Push to release/*: bump patch, deploy staging, create PR to main
+│   ├── release-staging.yml             # Push to release/*: bump patch, deploy to prerelease.sbomviewer.com, create PR to main
 │   ├── azure-static-web-apps-sbomviewer.yml  # Push to main: deploy + create GitHub release
 │   └── deploy-bicep.yml                # Infrastructure deployment
 ├── docs/                               # Design docs and plans
@@ -111,7 +111,7 @@ SBOMViewer.slnx
 
 ### Versioning
 
-The app version lives in `Directory.Build.props` at the repo root and is inherited by all projects. `release-staging.yml` increments the patch segment on every merge to a `release/*` branch and commits it back with `[skip ci]`.
+The app version lives in `Directory.Build.props` at the repo root and is inherited by all projects. `release-staging.yml` increments the patch segment on every push to a `release/*` branch and commits it back with `[skip ci]`. Version bumping is skipped when the push is a merge from `main` (detected by inspecting the merge commit's second parent).
 
 ### Data Flow
 
@@ -176,9 +176,9 @@ Uses **Microsoft.FluentUI.AspNetCore.Components** (v4.13.2) for all UI component
 | Workflow | Trigger | What it does |
 |----------|---------|--------------|
 | `ci.yml` | PR to `main` or `release/*` | Build, unit tests, Playwright E2E |
-| `release-staging.yml` | Push to `release/*` | Bump patch in `Directory.Build.props`, deploy staging env, run all tests, open PR to `main` |
-| `azure-static-web-apps-sbomviewer.yml` | Push to `main` | Build, unit tests, deploy to production SWA, create GitHub release |
-| `deploy-bicep.yml` | Change to `Infra/main.bicep` | Deploy Azure infrastructure |
+| `release-staging.yml` | Push to `release/*` | Bump patch (skipped on merges from `main`), deploy to staging SWA (`prerelease.sbomviewer.com`), run all tests, open PR to `main` |
+| `azure-static-web-apps-sbomviewer.yml` | Push to `main` | Build, unit tests, deploy to production SWA (`www.sbomviewer.com`), create GitHub release |
+| `deploy-bicep.yml` | Change to `Infra/main.bicep` | Deploy Azure infrastructure (production + staging SWA) |
 
 ## Coding Conventions
 

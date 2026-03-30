@@ -20,5 +20,5 @@ jobs:
       - name: Deploy Bicep
         run: |
           az deployment group create \
-            --resource-group MyResourceGroup \
+            --resource-group rg-sbomviewer-eastus2-001 \
             --template-file Infra/main.bicep

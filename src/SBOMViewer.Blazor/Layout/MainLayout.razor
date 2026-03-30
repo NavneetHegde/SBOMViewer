@@ -1,6 +1,8 @@
 @inherits LayoutComponentBase
 @inject SbomState SbomState
+@inject ChatState ChatState
 @using System.Reflection
+@implements IDisposable
 
 @code {
     private DesignThemeModes ThemeMode = DesignThemeModes.System;
@@ -15,6 +17,22 @@
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion.Split('+')[0]
         ?? "unknown";
+
+    protected override void OnInitialized()
+    {
+        ChatState.OnChange += StateHasChanged;
+    }
+
+    private void ToggleChatPanel()
+    {
+        ChatState.IsChatPanelOpen = !ChatState.IsChatPanelOpen;
+        ChatState.NotifyStateChanged();
+    }
+
+    public void Dispose()
+    {
+        ChatState.OnChange -= StateHasChanged;
+    }
 }
 <FluentDesignTheme Mode="@ThemeMode" StorageName="theme" OfficeColor="OfficeColor.Windows" />
 <div class="app-container">
@@ -32,28 +50,37 @@
 
 
         <!-- Main Content -->
-        <FluentStack Class="main" Orientation="Orientation.Vertical" Width="100%"
-                     Style="flex:1; overflow:hidden; padding:0rem; gap:0rem;">
+        <div style="flex:1; display:flex; flex-direction:column; min-height:0;">
 
             <!-- Toolbar -->
             <FluentToolbar id="toolbar-fluent-components-two">
                 <UploadFile />
+                <FluentButton Appearance="Appearance.Stealth"
+                              IconStart="@(new Icons.Regular.Size20.Chat())"
+                              Title="AI Chat"
+                              OnClick="ToggleChatPanel" />
             </FluentToolbar>
 
-            <!-- Scrollable Content -->
-            <FluentBodyContent Class="body-content" Style="flex:1; overflow:auto;">
-                <ErrorBoundary>
-                    <ChildContent>
-                        <div class="content" style="padding:1rem; border:1px solid var(--neutral-stroke-1); border-radius:0.5rem; min-height:400px;">
-                            @Body
-                        </div>
-                    </ChildContent>
-                    <ErrorContent Context="ex">
-                        <div class="blazor-error-boundary">@ex.Message</div>
-                    </ErrorContent>
-                </ErrorBoundary>
-            </FluentBodyContent>
-        </FluentStack>
+            <!-- Scrollable Content + Chat Panel -->
+            <div style="flex:1; display:flex; flex-direction:row; min-height:0;">
+                <div style="flex:1; overflow:auto; min-height:0;">
+                    <ErrorBoundary>
+                        <ChildContent>
+                            <div class="content" style="padding:1rem; border:1px solid var(--neutral-stroke-1); border-radius:0.5rem; min-height:400px;">
+                                @Body
+                            </div>
+                        </ChildContent>
+                        <ErrorContent Context="ex">
+                            <div class="blazor-error-boundary">@ex.Message</div>
+                        </ErrorContent>
+                    </ErrorBoundary>
+                </div>
+                @if (ChatState.IsChatPanelOpen)
+                {
+                    <ChatPanel />
+                }
+            </div>
+        </div>
 
         <!-- Footer -->
         <FluentFooter Style="padding:0.5rem; display:flex; justify-content:center; align-items:center; gap:0.75rem; font-size:0.85rem; color:var(--neutral-foreground-2); border-top:1px solid var(--neutral-stroke-1); flex-shrink:0;">

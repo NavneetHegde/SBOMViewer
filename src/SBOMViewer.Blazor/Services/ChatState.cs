@@ -8,6 +8,7 @@ public class ChatState
 
     // Chat
     public List<ChatMessage> Messages { get; } = [];
+    public string? StreamingContent { get; set; }
     public bool IsLlmLoaded { get; set; }
     public bool IsLlmLoading { get; set; }
     public double LlmLoadProgress { get; set; }
@@ -31,6 +32,7 @@ public class ChatState
     public void ClearChat()
     {
         Messages.Clear();
+        StreamingContent = null;
         IsLlmLoaded = false;
         IsLlmLoading = false;
         LlmLoadProgress = 0;
@@ -52,6 +54,7 @@ public class ChatState
     public void Clear()
     {
         Messages.Clear();
+        StreamingContent = null;
         IsLlmLoaded = false;
         IsLlmLoading = false;
         LlmLoadProgress = 0;

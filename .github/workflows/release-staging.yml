@@ -89,6 +89,21 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.RELEASE_PAT_SBOM }}
 
+      - name: Check if merge is from main
+        id: check
+        run: |
+          PARENTS=$(git log --format="%P" -1)
+          PARENT_COUNT=$(echo $PARENTS | wc -w)
+          FROM_MAIN=false
+          if [ "$PARENT_COUNT" -ge 2 ]; then
+            SECOND_PARENT=$(echo $PARENTS | awk '{print $2}')
+            if git merge-base --is-ancestor "$SECOND_PARENT" origin/main; then
+              FROM_MAIN=true
+            fi
+          fi
+          echo "from_main=$FROM_MAIN" >> $GITHUB_OUTPUT
+          echo "Merge from main: $FROM_MAIN"
+
       - name: Read and bump patch version
         id: version
         run: |
@@ -96,14 +111,20 @@ jobs:
           MAJOR=$(echo "$CURRENT" | cut -d. -f1)
           MINOR=$(echo "$CURRENT" | cut -d. -f2)
           PATCH=$(echo "$CURRENT" | cut -d. -f3)
-          NEW_PATCH=$((PATCH + 1))
-          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
-          sed -i "s|<Version>$CURRENT</Version>|<Version>$NEW_VERSION</Version>|" Directory.Build.props
+          if [ "${{ steps.check.outputs.from_main }}" = "true" ]; then
+            NEW_VERSION="$CURRENT"
+            echo "Skipping version bump (merge from main) — keeping $CURRENT"
+          else
+            NEW_PATCH=$((PATCH + 1))
+            NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+            sed -i "s|<Version>$CURRENT</Version>|<Version>$NEW_VERSION</Version>|" Directory.Build.props
+            echo "Bumped $CURRENT → $NEW_VERSION"
+          fi
           echo "old=$CURRENT" >> $GITHUB_OUTPUT
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "Bumped $CURRENT → $NEW_VERSION"
 
       - name: Commit and push version bump
+        if: steps.check.outputs.from_main != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -117,17 +138,16 @@ jobs:
 
       - run: dotnet publish src/SBOMViewer.Blazor/SBOMViewer.Blazor.csproj -c Release --output publish_output
 
-      - name: Deploy staging environment to Azure SWA
+      - name: Deploy to staging SWA (staging.sbomviewer.com)
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           app_location: "publish_output/wwwroot"
           api_location: ""
           output_location: ""
           skip_app_build: true
-          deployment_environment: "staging"
 
       - name: Create PR to main
         env:
