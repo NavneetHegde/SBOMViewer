@@ -137,9 +137,9 @@ dotnet test tests/SBOMViewer.E2E.Tests -c Release --no-build -e BASE_URL=http://
 | Workflow | Trigger | What it does |
 |----------|---------|--------------|
 | `ci.yml` | PR to `main` or `release/*` | Build, unit tests, Playwright E2E |
-| `release-staging.yml` | Push to `release/*` | Bump patch version, deploy staging, run all tests, open PR to `main` |
-| `azure-static-web-apps-sbomviewer.yml` | Push to `main` | Build, unit tests, deploy to production, create GitHub release |
-| `deploy-bicep.yml` | Change to `Infra/main.bicep` | Deploy Azure infrastructure |
+| `release-staging.yml` | Push to `release/*` | Bump patch version (skipped on merges from `main`), deploy to `prerelease.sbomviewer.com`, run all tests, open PR to `main` |
+| `azure-static-web-apps-sbomviewer.yml` | Push to `main` | Build, unit tests, deploy to `www.sbomviewer.com`, create GitHub release |
+| `deploy-bicep.yml` | Change to `Infra/main.bicep` | Deploy Azure infrastructure (production + staging SWA) |
 
 ## Contributing
 
