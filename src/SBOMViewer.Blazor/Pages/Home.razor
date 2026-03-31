@@ -15,24 +15,12 @@
     {
         <FluentCard Style="padding:1rem; text-align:center; color:var(--neutral-foreground-2);">
             No SBOM loaded yet. Please select a format and upload a file.
-            @if (_betaBannerVisible)
-            {
-                <div class="beta-banner" style="margin-top:1rem; border-radius:0.375rem;">
-                    <span>
-                        Try WebLLM beta features integration at
-                        <a href="https://staging.sbomviewer.com" target="_blank" rel="noopener noreferrer">staging.sbomviewer.com</a>
-                    </span>
-                    <button class="beta-banner-dismiss" @onclick="() => _betaBannerVisible = false" title="Dismiss" aria-label="Dismiss beta banner">&#x2715;</button>
-                </div>
-            }
         </FluentCard>
     }
 
 </FluentStack>
 
 @code {
-    private bool _betaBannerVisible = true;
-
     protected override void OnInitialized()
     {
         SbomState.OnChange += StateHasChanged;
