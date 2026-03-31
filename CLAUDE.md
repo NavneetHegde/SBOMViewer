@@ -111,7 +111,10 @@ SBOMViewer.slnx
 
 ### Versioning
 
-The app version lives in `Directory.Build.props` at the repo root and is inherited by all projects. `release-staging.yml` increments the patch segment on every push to a `release/*` branch and commits it back with `[skip ci]`. Version bumping is skipped when the push is a merge from `main` (detected by inspecting the merge commit's second parent).
+The app version lives in `Directory.Build.props` at the repo root and is inherited by all projects. It always holds the last *released* version.
+
+- **`release/*` branches**: compute a build-time RC version `major.minor.(patch+1)-rc.YYYYMMDDHHmmss` and pass it via `-p:Version=...` to `dotnet publish`. Nothing is committed to `Directory.Build.props`. Multiple pushes to the same branch all produce the same base version (e.g., `3.0.7-rc.*`) with different timestamps.
+- **`main` branch**: bumps the patch in `Directory.Build.props`, commits it back with `[skip ci]`, then builds and deploys the final version (e.g., `3.0.7`).
 
 ### Data Flow
 
@@ -176,8 +179,8 @@ Uses **Microsoft.FluentUI.AspNetCore.Components** (v4.13.2) for all UI component
 | Workflow | Trigger | What it does |
 |----------|---------|--------------|
 | `ci.yml` | PR to `main` or `release/*` | Build, unit tests, Playwright E2E |
-| `release-staging.yml` | Push to `release/*` | Bump patch (skipped on merges from `main`), deploy to staging SWA (`prerelease.sbomviewer.com`), run all tests, open PR to `main` |
-| `azure-static-web-apps-sbomviewer.yml` | Push to `main` | Build, unit tests, deploy to production SWA (`www.sbomviewer.com`), create GitHub release |
+| `release-staging.yml` | Push to `release/*` | Compute RC version (`major.minor.(patch+1)-rc.datetime`), run all tests, deploy RC to staging SWA (`prerelease.sbomviewer.com`), open PR to `main` |
+| `azure-static-web-apps-sbomviewer.yml` | Push to `main` | Bump patch in `Directory.Build.props`, commit, build, unit tests, deploy to production SWA (`www.sbomviewer.com`), create GitHub release |
 | `deploy-bicep.yml` | Change to `Infra/main.bicep` | Deploy Azure infrastructure (production + staging SWA) |
 
 ## Coding Conventions

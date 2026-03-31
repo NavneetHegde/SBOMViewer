@@ -1,4 +1,4 @@
-name: Release Staging — Test, Bump Patch, Deploy, Create PR to main
+name: Release Staging — Test, Deploy RC, Create PR to main
 
 on:
   push:
@@ -80,63 +80,31 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     permissions:
-      contents: write       # push version-bump commit
       pull-requests: write  # create PR to main
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.RELEASE_PAT_SBOM }}
 
-      - name: Check if merge is from main
-        id: check
-        run: |
-          PARENTS=$(git log --format="%P" -1)
-          PARENT_COUNT=$(echo $PARENTS | wc -w)
-          FROM_MAIN=false
-          if [ "$PARENT_COUNT" -ge 2 ]; then
-            SECOND_PARENT=$(echo $PARENTS | awk '{print $2}')
-            if git merge-base --is-ancestor "$SECOND_PARENT" origin/main; then
-              FROM_MAIN=true
-            fi
-          fi
-          echo "from_main=$FROM_MAIN" >> $GITHUB_OUTPUT
-          echo "Merge from main: $FROM_MAIN"
-
-      - name: Read and bump patch version
+      - name: Compute RC version
         id: version
         run: |
           CURRENT=$(grep -oP '(?<=<Version>)[^<]+' Directory.Build.props)
           MAJOR=$(echo "$CURRENT" | cut -d. -f1)
           MINOR=$(echo "$CURRENT" | cut -d. -f2)
           PATCH=$(echo "$CURRENT" | cut -d. -f3)
-          if [ "${{ steps.check.outputs.from_main }}" = "true" ]; then
-            NEW_VERSION="$CURRENT"
-            echo "Skipping version bump (merge from main) — keeping $CURRENT"
-          else
-            NEW_PATCH=$((PATCH + 1))
-            NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
-            sed -i "s|<Version>$CURRENT</Version>|<Version>$NEW_VERSION</Version>|" Directory.Build.props
-            echo "Bumped $CURRENT → $NEW_VERSION"
-          fi
-          echo "old=$CURRENT" >> $GITHUB_OUTPUT
-          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-
-      - name: Commit and push version bump
-        if: steps.check.outputs.from_main != 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Directory.Build.props
-          git commit -m "chore: bump patch to ${{ steps.version.outputs.version }} [skip ci]"
-          git push
+          NEW_PATCH=$((PATCH + 1))
+          DATETIME=$(date -u +"%Y%m%d%H%M%S")
+          RC_VERSION="$MAJOR.$MINOR.$NEW_PATCH-rc.$DATETIME"
+          RELEASE_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+          echo "rc_version=$RC_VERSION" >> $GITHUB_OUTPUT
+          echo "release_version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+          echo "RC version: $RC_VERSION (will release as $RELEASE_VERSION)"
 
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
-      - run: dotnet publish src/SBOMViewer.Blazor/SBOMViewer.Blazor.csproj -c Release --output publish_output
+      - run: dotnet publish src/SBOMViewer.Blazor/SBOMViewer.Blazor.csproj -c Release -p:Version=${{ steps.version.outputs.rc_version }} --output publish_output
 
       - name: Deploy to staging SWA (staging.sbomviewer.com)
         uses: Azure/static-web-apps-deploy@v1
@@ -154,19 +122,19 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           BRANCH="${GITHUB_REF_NAME}"
-          VERSION="${{ steps.version.outputs.version }}"
-          OLD="${{ steps.version.outputs.old }}"
+          RC_VERSION="${{ steps.version.outputs.rc_version }}"
+          RELEASE_VERSION="${{ steps.version.outputs.release_version }}"
           gh pr create \
             --base main \
             --head "$BRANCH" \
-            --title "Release v${VERSION}" \
-            --body "## Release v${VERSION}
+            --title "Release v${RELEASE_VERSION}" \
+            --body "## Release v${RELEASE_VERSION}
 
           Automated release PR created after staging CI passed on branch \`${BRANCH}\`.
 
-          - Patch bumped: ${OLD} → ${VERSION}
+          - RC deployed to staging: \`${RC_VERSION}\`
           - All unit tests passed
           - All Playwright E2E tests passed against staging build
 
-          **Merge this PR to deploy to production.**" \
+          **Merge this PR to deploy v${RELEASE_VERSION} to production.**" \
             --label "release" 2>/dev/null || echo "PR already open — skipping creation"
