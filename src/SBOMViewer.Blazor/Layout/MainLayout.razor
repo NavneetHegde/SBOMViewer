@@ -56,9 +56,11 @@
             <FluentToolbar id="toolbar-fluent-components-two">
                 <UploadFile />
                 <FluentButton Appearance="Appearance.Stealth"
-                              IconStart="@(new Icons.Regular.Size20.Chat())"
+                              IconStart="@(new Icons.Regular.Size32.Sparkle())"
                               Title="AI Chat"
-                              OnClick="ToggleChatPanel" />
+                              OnClick="ToggleChatPanel">
+                    <span style="font-weight:600; font-size:0.85rem; letter-spacing:0.03em;">AI Chat</span>
+                </FluentButton>
             </FluentToolbar>
 
             <!-- Scrollable Content + Chat Panel -->
