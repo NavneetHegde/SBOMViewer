@@ -6,231 +6,117 @@
 @inject VulnerabilityService VulnService
 @inject SbomState SbomState
 
+@* ── Scan overlay ── *@
 @if (ChatState.IsScanning)
 {
-    <div style="position:fixed; top:0; left:0; right:0; bottom:0; background-color:rgba(0,0,0,0.5); display:flex; flex-direction:column; justify-content:center; align-items:center; gap:1rem; z-index:1000;">
-        <FluentProgress Min="0" Max="100" Value="@_scanPercent" />
-        <span style="color:white; font-size:1rem;">Scanning for vulnerabilities... @ChatState.ScanProgress / @ChatState.ScanTotal</span>
+    <div style="position:fixed; top:0; left:0; right:0; bottom:0; background:oklch(11% 0.018 240 / 0.85); display:flex; flex-direction:column; justify-content:center; align-items:center; gap:16px; z-index:1000;">
+        <div class="spinner" style="width:40px; height:40px; border-width:3px;"></div>
+        <div class="scan-running" style="padding:14px 24px; font-size:14px;">
+            Scanning @ChatState.ScanProgress / @ChatState.ScanTotal packages against OSV.dev…
+        </div>
+        <p style="font-size:12px; color:var(--text-dimmer);">All processing happens in your browser. No data leaves your machine.</p>
     </div>
 }
 
 @if (RootElement.ValueKind == JsonValueKind.Object)
 {
-    <FluentCard Style="background-color:var(--neutral-layer1); color:var(--neutral-foreground-rest); padding:1rem;">
-        <!-- Document Filename Centered -->
-        <div style="display:flex; align-items:center; justify-content:center; gap:0.5rem; margin-bottom:1rem;">
-            <FluentIcon Value="@(new Icons.Regular.Size24.DocumentTextExtract())" />
-            <span style="font-weight:bold; font-size:1.1rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"
-                  title="@FileName">
-                @FileName
-            </span>
-        </div>
+    <div class="dashboard">
 
-        <FluentAccordion>
-            @{
-                // Group 1: Scalar top-level properties → "General Information" accordion
-                var scalarProps = GetPresentProperties(SchemaNodeType.String, SchemaNodeType.Integer,
-                    SchemaNodeType.Number, SchemaNodeType.Boolean);
+        @* ── Sidebar ── *@
+        <div class="sidebar">
+            <div class="sidebar-section">Views</div>
 
-                if (scalarProps.Count > 0)
+            <button class="sidebar-item @(_activeTab == "overview" ? "active" : "")"
+                    @onclick='() => SetTab("overview")'>
+                <span class="si-icon">◈</span>
+                <span class="si-label">Overview</span>
+            </button>
+
+            @if (_componentCount > 0)
+            {
+                <button class="sidebar-item @(_activeTab == "components" ? "active" : "")"
+                        @onclick='() => SetTab("components")'>
+                    <span class="si-icon">⊟</span>
+                    <span class="si-label">Components</span>
+                    <span class="si-count">@_componentCount</span>
+                </button>
+            }
+
+            <button class="sidebar-item @(_activeTab == "vulns" ? "active" : "")"
+                    @onclick='() => SetTab("vulns")'>
+                <span class="si-icon">⚑</span>
+                <span class="si-label">Vulnerabilities</span>
+                @if (_totalVulns > 0)
                 {
-                    <FluentAccordionItem Expanded="true">
-                        <HeadingTemplate>
-                            <div style="display:flex; align-items:center; gap:0.5rem;">
-                                <FluentIcon Value="@(new Icons.Regular.Size24.Info())" />
-                                <span>General Information</span>
-                            </div>
-                        </HeadingTemplate>
-                        <ChildContent>
-                            <div class="info-container">
-                                @foreach (var propName in scalarProps)
-                                {
-                                    if (RootElement.TryGetProperty(propName, out var val))
-                                    {
-                                        var schemaProp = Schema.Properties.GetValueOrDefault(propName);
-                                        <div><strong>@(schemaProp?.Title ?? HumanizePropertyName(propName)):</strong> @FormatScalar(val)</div>
-                                    }
-                                }
-                            </div>
-                        </ChildContent>
-                    </FluentAccordionItem>
-                    <FluentDivider />
+                    <span class="si-count" style="color:var(--crit); background:oklch(60% 0.22 20 / 0.12);">@_totalVulns</span>
                 }
+            </button>
 
-                // Vulnerability Scan accordion section
-                <FluentAccordionItem Expanded="@(_vulnExpanded)">
-                    <HeadingTemplate>
-                        <div style="display:flex; align-items:center; gap:0.5rem; width:100%;">
-                            <FluentIcon Value="@(new Icons.Regular.Size24.ShieldError())" Color="Color.Error" />
-                            <span>Vulnerabilities</span>
-                            @if (_totalVulns > 0)
-                            {
-                                <FluentBadge Appearance="Appearance.Accent"
-                                             BackgroundColor="#d32f2f" Color="white"
-                                             Style="font-size:0.75rem; font-weight:600;">
-                                    @_totalVulns
-                                </FluentBadge>
-                            }
-                            <span style="flex:1;"></span>
-                            <div style="position:relative; display:inline-flex; align-items:center;"
-                                 @onclick:stopPropagation="true"
-                                 @onmouseenter="ShowInfoPopover"
-                                 @onmouseleave="HideInfoPopover">
-                                <span style="cursor:help; display:inline-flex; align-items:center; opacity:0.6; transition:opacity 0.15s;">
-                                    <FluentIcon Value="@(new Icons.Regular.Size16.QuestionCircle())" />
-                                </span>
-                                @if (_showInfoPopover)
-                                {
-                                    <div style="position:absolute; top:calc(100% + 8px); right:0; z-index:1000;
-                                                background:var(--neutral-layer-floating); color:var(--neutral-foreground-rest);
-                                                border:1px solid var(--neutral-stroke-rest); border-radius:8px;
-                                                padding:0.85rem 1rem; min-width:300px; max-width:340px;
-                                                box-shadow:0 8px 24px rgba(0,0,0,0.18); font-size:0.85rem; line-height:1.5;
-                                                pointer-events:none;">
-                                        <div style="display:flex; align-items:center; gap:0.4rem; margin-bottom:0.5rem; font-weight:600; font-size:0.9rem;">
-                                            <FluentIcon Value="@(new Icons.Regular.Size16.Info())" Color="Color.Accent" />
-                                            About Vulnerability Scanning
-                                        </div>
-                                        <p style="margin:0 0 0.4rem 0;">
-                                            Scans up to <strong>500 components</strong> in this SBOM against the <strong>OSV.dev</strong> (Open Source Vulnerabilities) database.
-                                        </p>
-                                        <p style="margin:0; color:var(--neutral-foreground-hint); font-size:0.8rem;">
-                                            Results include severity ratings, CVE IDs, and available fix versions.
-                                        </p>
-                                    </div>
-                                }
-                            </div>
-                            <FluentButton Appearance="Appearance.Accent"
-                                          Size="ButtonSize.Small"
-                                          IconStart="@(ChatState.IsScanning ? new Icons.Regular.Size16.ArrowSync() : new Icons.Regular.Size16.ShieldTask())"
-                                          OnClick="@ScanVulnerabilities"
-                                          OnClick:stopPropagation="true"
-                                          Disabled="@ChatState.IsScanning"
-                                          Loading="@ChatState.IsScanning"
-                                          Title="Scan for known vulnerabilities"
-                                          Style="min-width:auto; font-weight:600;">
-                                @if (ChatState.IsScanning)
-                                {
-                                    @($"Scanning {ChatState.ScanProgress}/{ChatState.ScanTotal}...")
-                                }
-                                else
-                                {
-                                    @("Scan for Vulnerabilities")
-                                }
-                            </FluentButton>
-                        </div>
-                    </HeadingTemplate>
-                    <ChildContent>
-                        @if (ChatState.IsScanning)
-                        {
-                            <div style="padding:1rem; display:flex; flex-direction:column; align-items:center; gap:0.75rem;">
-                                <FluentProgress Min="0" Max="100" Value="@(_scanPercent)" />
-                                <span style="font-size:0.85rem; color:var(--neutral-foreground-hint);">
-                                    Scanning packages for vulnerabilities... @ChatState.ScanProgress / @ChatState.ScanTotal
-                                </span>
-                            </div>
-                        }
-                        <VulnerabilitySummary Results="@ChatState.VulnResults" />
-                        @if (ChatState.ScanError is not null)
-                        {
-                            <div style="padding:0.5rem;">
-                                <FluentBadge Appearance="Appearance.Lightweight" Color="Color.Error">@ChatState.ScanError</FluentBadge>
-                            </div>
-                        }
-                        @foreach (var warning in ChatState.ScanWarnings)
-                        {
-                            <div style="padding:0.4rem 0.5rem; display:flex; align-items:center; gap:0.4rem; font-size:0.82rem; color:var(--warning-foreground, #b45309);">
-                                <FluentIcon Value="@(new Icons.Regular.Size16.Warning())" />
-                                @warning
-                            </div>
-                        }
-                        @if (ChatState.VulnResults is null && !ChatState.IsScanning && ChatState.ScanError is null)
-                        {
-                            <div style="padding:1rem; text-align:center;">
-                                <div style="color:var(--neutral-foreground-hint); margin-bottom:0.5rem;">
-                                    No scan results yet.
-                                </div>
-                                <span style="font-size:0.8rem; color:var(--neutral-foreground-hint);">
-                                    Click <strong>Scan</strong> to check all packages against the
-                                    <FluentAnchor Href="https://osv.dev" Target="_blank" Appearance="Appearance.Hypertext">OSV.dev</FluentAnchor>
-                                    vulnerability database.
-                                </span>
-                            </div>
-                        }
-                    </ChildContent>
-                </FluentAccordionItem>
-                <FluentDivider />
-
-                // Group 2: Object/Array properties → individual accordion sections
-                var complexProps = GetPresentProperties(SchemaNodeType.Object, SchemaNodeType.Array);
-
-                foreach (var propName in complexProps)
+            @if (_dynamicSections.Count > 0)
+            {
+                <div class="sidebar-section" style="margin-top:8px;">Sections</div>
+                @foreach (var sec in _dynamicSections)
                 {
-                    if (!RootElement.TryGetProperty(propName, out var val)) continue;
-                    var schemaProp = Schema.Properties.GetValueOrDefault(propName);
-                    var title = schemaProp?.Title ?? HumanizePropertyName(propName);
-                    var isFirstComplex = propName == complexProps.First();
-
-                    <FluentAccordionItem Expanded="@isFirstComplex">
-                        <HeadingTemplate>
-                            <div style="display:flex; align-items:center; gap:0.5rem;">
-                                <FluentIcon Value="@GetSectionIcon(propName)" />
-                                <span>@title</span>
-                                @if (val.ValueKind == JsonValueKind.Array)
-                                {
-                                    <FluentBadge Appearance="Appearance.Accent"
-                                                 BackgroundColor="var(--accent-fill-rest)" Color="white"
-                                                 Style="font-size:0.75rem; font-weight:600;">
-                                        @val.GetArrayLength()
-                                    </FluentBadge>
-                                }
-                            </div>
-                        </HeadingTemplate>
-                        <ChildContent>
-                            <DynamicSection Element="@val" Schema="@schemaProp" PropertyName="@propName" />
-                        </ChildContent>
-                    </FluentAccordionItem>
-                    <FluentDivider />
-                }
-
-                // Group 3: Properties present in JSON but NOT in schema (unknown properties)
-                foreach (var prop in RootElement.EnumerateObject())
-                {
-                    if (Schema.Properties.ContainsKey(prop.Name) || prop.Name == "$schema")
-                        continue;
-
-                    // Skip scalar unknowns that were already captured in General Info via JSON traversal
-                    if (prop.Value.ValueKind is JsonValueKind.String or JsonValueKind.Number
-                        or JsonValueKind.True or JsonValueKind.False)
-                    {
-                        // Show as a bonus entry in General Information if not already there
-                        continue;
-                    }
-
-                    <FluentAccordionItem>
-                        <HeadingTemplate>
-                            <div style="display:flex; align-items:center; gap:0.5rem;">
-                                <FluentIcon Value="@(new Icons.Regular.Size24.List())" />
-                                <span>@HumanizePropertyName(prop.Name)</span>
-                                @if (prop.Value.ValueKind == JsonValueKind.Array)
-                                {
-                                    <FluentBadge Appearance="Appearance.Accent"
-                                                 BackgroundColor="var(--accent-fill-rest)" Color="white"
-                                                 Style="font-size:0.75rem; font-weight:600;">
-                                        @prop.Value.GetArrayLength()
-                                    </FluentBadge>
-                                }
-                            </div>
-                        </HeadingTemplate>
-                        <ChildContent>
-                            <DynamicSection Element="@prop.Value" Schema="@null" PropertyName="@prop.Name" />
-                        </ChildContent>
-                    </FluentAccordionItem>
-                    <FluentDivider />
+                    var secKey   = sec.Key;
+                    var secLabel = sec.Value.Label;
+                    var secCount = sec.Value.Count;
+                    var secIcon  = sec.Value.Icon;
+                    <button class="sidebar-item @(_activeTab == secKey ? "active" : "")"
+                            @onclick="() => SetTab(secKey)">
+                        <span class="si-icon">@secIcon</span>
+                        <span class="si-label">@secLabel</span>
+                        @if (secCount > 0)
+                        {
+                            <span class="si-count">@secCount</span>
+                        }
+                    </button>
                 }
             }
-        </FluentAccordion>
-    </FluentCard>
+
+            @* SBOM meta widget *@
+            <div class="sbom-meta">
+                <div class="sbom-meta-name">@FileName</div>
+                @if (SbomState.DetectedFormat is not null)
+                {
+                    <div class="sbom-meta-row"><span>Format</span><span>@GetFormatName(SbomState.DetectedFormat.Value)</span></div>
+                    <div class="sbom-meta-row"><span>Spec</span><span>@GetFormatVersion(SbomState.DetectedFormat.Value)</span></div>
+                }
+                @if (_generatedDate is not null)
+                {
+                    <div class="sbom-meta-row"><span>Generated</span><span>@_generatedDate</span></div>
+                }
+                <div class="sbom-meta-row"><span>Components</span><span>@_componentCount</span></div>
+            </div>
+        </div>
+
+        @* ── Main area ── *@
+        <div class="main">
+            @if (_activeTab == "overview")
+            {
+                @RenderOverviewTab()
+            }
+            else if (_activeTab == "components")
+            {
+                @RenderComponentsTab()
+            }
+            else if (_activeTab == "vulns")
+            {
+                @RenderVulnsTab()
+            }
+            else if (_dynamicSections.TryGetValue(_activeTab, out var dynSec))
+            {
+                <div class="tab-bar">
+                    <button class="tab active">
+                        @dynSec.Label
+                        @if (dynSec.Count > 0) { <span class="tbadge">@dynSec.Count</span> }
+                    </button>
+                </div>
+                <div class="content">
+                    <DynamicSection Element="@dynSec.Element" Schema="@dynSec.Schema" PropertyName="@_activeTab" />
+                </div>
+            }
+        </div>
+    </div>
 }
 
 @code {
@@ -238,13 +124,44 @@
     [Parameter] public SchemaNode Schema { get; set; } = default!;
     [Parameter] public string? FileName { get; set; }
 
-    private bool _vulnExpanded;
-    private bool _showInfoPopover;
-    private int _totalVulns;
+    private string _activeTab = "overview";
 
-    private int _scanPercent => ChatState.ScanTotal > 0
-        ? (int)(ChatState.ScanProgress * 100.0 / ChatState.ScanTotal)
-        : 0;
+    // Computed stats
+    private int _componentCount;
+    private int _licenseCount;
+    private string? _generatedDate;
+    private int _totalVulns;
+    private int _critCount, _highCount, _medCount, _lowCount;
+    private Dictionary<string, int> _licenseDist = [];
+
+    // Component data
+    private List<ComponentRow> _componentRows = [];
+    private Dictionary<string, string> _vulnWorstSev  = [];
+    private Dictionary<string, int>    _vulnCounts    = [];
+
+    // Component table state
+    private string  _compSearch    = "";
+    private string? _compSevFilter = null;
+    private string  _compSortCol   = "name";
+    private bool    _compSortAsc   = true;
+
+    // Vuln tab state
+    private string  _vulnSearch    = "";
+    private string? _vulnSevFilter = null;
+    private HashSet<string> _expandedVulns = [];
+
+    // Dynamic sidebar sections
+    private Dictionary<string, DynSection> _dynamicSections = [];
+
+    private record ComponentRow(string Name, string Version, string Type, string License, string? Purl);
+    private record DynSection(string Label, string Icon, int Count, JsonElement Element, SchemaNode? Schema);
+
+    // ── Lifecycle ──────────────────────────────────────────────────────────────
+
+    protected override void OnParametersSet()
+    {
+        BuildDerivedData();
+    }
 
     protected override void OnInitialized()
     {
@@ -258,47 +175,189 @@
 
     private void OnChatStateChanged()
     {
-        _totalVulns = ChatState.VulnResults?.Sum(r => r.Vulnerabilities.Count) ?? 0;
-        if (ChatState.VulnResults is null)
-            _vulnExpanded = false;
+        UpdateVulnStats();
         StateHasChanged();
     }
 
-    private void ShowInfoPopover() => _showInfoPopover = true;
-    private void HideInfoPopover() => _showInfoPopover = false;
+    private void SetTab(string tab) { _activeTab = tab; }
 
+    // ── Data derivation ────────────────────────────────────────────────────────
+
+    private void BuildDerivedData()
+    {
+        _componentRows = ExtractComponentRows();
+        _componentCount = _componentRows.Count;
+
+        var licGroups = _componentRows
+            .Where(r => !string.IsNullOrEmpty(r.License))
+            .GroupBy(r => r.License)
+            .OrderByDescending(g => g.Count())
+            .ToList();
+        _licenseCount = licGroups.Count;
+        _licenseDist  = licGroups.Take(5).ToDictionary(g => g.Key, g => g.Count());
+
+        _generatedDate = ExtractGeneratedDate();
+        BuildDynamicSections();
+        UpdateVulnStats();
+    }
+
+    private void UpdateVulnStats()
+    {
+        if (ChatState.VulnResults is null)
+        {
+            _totalVulns = 0;
+            _critCount = _highCount = _medCount = _lowCount = 0;
+            _vulnWorstSev = [];
+            _vulnCounts   = [];
+            return;
+        }
+
+        var all = ChatState.VulnResults.SelectMany(r => r.Vulnerabilities).ToList();
+        _totalVulns = all.Count;
+        _critCount  = all.Count(v => v.Severity == "CRITICAL");
+        _highCount  = all.Count(v => v.Severity == "HIGH");
+        _medCount   = all.Count(v => v.Severity == "MEDIUM");
+        _lowCount   = all.Count(v => v.Severity == "LOW");
+
+        static int Ord(string? s) => s switch { "CRITICAL" => 0, "HIGH" => 1, "MEDIUM" => 2, "LOW" => 3, _ => 9 };
+
+        _vulnWorstSev = [];
+        _vulnCounts   = [];
+        foreach (var r in ChatState.VulnResults.Where(r => r.Vulnerabilities.Count > 0))
+        {
+            _vulnCounts[r.PackageName]   = r.Vulnerabilities.Count;
+            var worst = r.Vulnerabilities.OrderBy(v => Ord(v.Severity)).First();
+            _vulnWorstSev[r.PackageName] = worst.Severity ?? "UNKNOWN";
+        }
+    }
+
+    // ── JSON extraction ────────────────────────────────────────────────────────
+
+    private List<ComponentRow> ExtractComponentRows()
+    {
+        var rows = new List<ComponentRow>();
+        var format = SbomState.DetectedFormat;
+
+        if (format is SbomFormat.CycloneDX_1_6 or SbomFormat.CycloneDX_1_7)
+        {
+            if (!RootElement.TryGetProperty("components", out var comps) ||
+                comps.ValueKind != JsonValueKind.Array) return rows;
+
+            foreach (var comp in comps.EnumerateArray())
+            {
+                var name    = comp.TryGetProperty("name",    out var n) ? n.GetString() ?? "" : "";
+                var version = comp.TryGetProperty("version", out var v) ? v.GetString() ?? "" : "";
+                var type    = comp.TryGetProperty("type",    out var t) ? t.GetString() ?? "" : "";
+                var purl    = comp.TryGetProperty("purl",    out var p) ? p.GetString()      : null;
+                var license = "";
+                if (comp.TryGetProperty("licenses", out var lics) && lics.ValueKind == JsonValueKind.Array)
+                {
+                    var first = lics.EnumerateArray().FirstOrDefault();
+                    if (first.ValueKind == JsonValueKind.Object)
+                    {
+                        if (first.TryGetProperty("license", out var lic) && lic.TryGetProperty("id", out var lid))
+                            license = lid.GetString() ?? "";
+                        else if (first.TryGetProperty("expression", out var expr))
+                            license = expr.GetString() ?? "";
+                    }
+                }
+                if (!string.IsNullOrEmpty(name))
+                    rows.Add(new ComponentRow(name, version, type, license, purl));
+            }
+        }
+        else if (format is SbomFormat.SPDX_2_2)
+        {
+            if (!RootElement.TryGetProperty("packages", out var pkgs) ||
+                pkgs.ValueKind != JsonValueKind.Array) return rows;
+
+            foreach (var pkg in pkgs.EnumerateArray())
+            {
+                var name    = pkg.TryGetProperty("name",             out var n) ? n.GetString() ?? "" : "";
+                var version = pkg.TryGetProperty("versionInfo",      out var v) ? v.GetString() ?? "" : "";
+                var license = pkg.TryGetProperty("licenseConcluded", out var l) ? l.GetString() ?? "" : "";
+                if (license is "NOASSERTION" or "NONE") license = "";
+                string? purl = null;
+                if (pkg.TryGetProperty("externalRefs", out var refs) && refs.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var r in refs.EnumerateArray())
+                    {
+                        if (r.TryGetProperty("referenceCategory", out var cat) &&
+                            r.TryGetProperty("referenceLocator",  out var loc) &&
+                            cat.GetString() is "PACKAGE-MANAGER" or "PACKAGE_MANAGER")
+                        { purl = loc.GetString(); break; }
+                    }
+                }
+                if (!string.IsNullOrEmpty(name))
+                    rows.Add(new ComponentRow(name, version, "package", license, purl));
+            }
+        }
+
+        return rows;
+    }
+
+    private string? ExtractGeneratedDate()
+    {
+        if (RootElement.TryGetProperty("metadata", out var meta) &&
+            meta.ValueKind == JsonValueKind.Object &&
+            meta.TryGetProperty("timestamp", out var ts))
+        {
+            var s = ts.GetString();
+            return s?.Length >= 10 ? s[..10] : s;
+        }
+        if (RootElement.TryGetProperty("creationInfo", out var ci) &&
+            ci.ValueKind == JsonValueKind.Object &&
+            ci.TryGetProperty("created", out var cr))
+        {
+            var s = cr.GetString();
+            return s?.Length >= 10 ? s[..10] : s;
+        }
+        return null;
+    }
+
+    private void BuildDynamicSections()
+    {
+        _dynamicSections = [];
+        var coreKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "components", "packages", "$schema" };
+
+        foreach (var prop in RootElement.EnumerateObject())
+        {
+            if (coreKeys.Contains(prop.Name)) continue;
+            if (prop.Value.ValueKind is not (JsonValueKind.Object or JsonValueKind.Array)) continue;
+            var schemaProp = Schema?.Properties?.GetValueOrDefault(prop.Name);
+            var count = prop.Value.ValueKind == JsonValueKind.Array ? prop.Value.GetArrayLength() : 0;
+            _dynamicSections[prop.Name] = new DynSection(
+                HumanizeName(prop.Name), GetSectionIcon(prop.Name), count, prop.Value, schemaProp);
+        }
+    }
+
+    // ── Vuln scan ──────────────────────────────────────────────────────────────
 
     private async Task ScanVulnerabilities()
     {
-        if (SbomState.DetectedFormat is null)
-            return;
+        if (SbomState.DetectedFormat is null) return;
 
         ChatState.IsScanning = true;
-        ChatState.ScanError = null;
-        _vulnExpanded = true;
+        ChatState.ScanError  = null;
+        _activeTab           = "vulns";
         ChatState.NotifyStateChanged();
 
         try
         {
-            var packages = PackageExtractor.ExtractPackages(
-                RootElement, SbomState.DetectedFormat.Value);
-
+            var packages = PackageExtractor.ExtractPackages(RootElement, SbomState.DetectedFormat.Value);
             if (packages.Count == 0)
             {
                 ChatState.ScanError = "No packages found in this SBOM to scan.";
-                ChatState.IsScanning = false;
-                ChatState.NotifyStateChanged();
                 return;
             }
 
             ChatState.ScanTotal = packages.Count;
-
             var results = await VulnService.ScanAsync(
                 packages,
                 onProgress: (done, total) =>
                 {
                     ChatState.ScanProgress = done;
-                    ChatState.ScanTotal = total;
+                    ChatState.ScanTotal    = total;
                     ChatState.NotifyStateChanged();
                     InvokeAsync(StateHasChanged);
                 },
@@ -309,7 +368,6 @@
                 });
 
             ChatState.VulnResults = results;
-            _totalVulns = results.Sum(r => r.Vulnerabilities.Count);
         }
         catch (Exception ex)
         {
@@ -322,80 +380,429 @@
         }
     }
 
-    /// <summary>
-    /// Returns schema-ordered property names that exist in the JSON and match the given node types.
-    /// Also includes non-schema scalar properties for the General Information section.
-    /// </summary>
-    private List<string> GetPresentProperties(params SchemaNodeType[] types)
-    {
-        var typeSet = new HashSet<SchemaNodeType>(types);
-        var result = new List<string>();
+    // ── Tab renderers (RenderFragment methods) ────────────────────────────────
 
-        // Schema-ordered properties first
-        foreach (var propName in Schema.PropertyOrder)
-        {
-            if (!Schema.Properties.TryGetValue(propName, out var schemaProp)) continue;
-            if (!typeSet.Contains(schemaProp.NodeType)) continue;
-            if (!RootElement.TryGetProperty(propName, out _)) continue;
-            result.Add(propName);
-        }
-
-        // For scalars, also include non-schema properties present in JSON
-        if (typeSet.Contains(SchemaNodeType.String) || typeSet.Contains(SchemaNodeType.Integer)
-            || typeSet.Contains(SchemaNodeType.Number) || typeSet.Contains(SchemaNodeType.Boolean))
-        {
-            foreach (var prop in RootElement.EnumerateObject())
-            {
-                if (result.Contains(prop.Name) || Schema.Properties.ContainsKey(prop.Name))
-                    continue;
-                if (prop.Name == "$schema") continue;
-                if (prop.Value.ValueKind is JsonValueKind.String or JsonValueKind.Number
-                    or JsonValueKind.True or JsonValueKind.False)
-                {
-                    result.Add(prop.Name);
+    private RenderFragment RenderOverviewTab() =>
+    @<div class="content fadein">
+        @* Stats grid *@
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Components</div>
+                <div class="stat-value">@_componentCount</div>
+                <div class="stat-sub">in this SBOM</div>
+                <div class="stat-bar"><div class="stat-bar-fill" style="width:100%; background:var(--accent)"></div></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Vulnerabilities</div>
+                <div class="stat-value" style="color:@(_critCount > 0 ? "var(--crit)" : _totalVulns > 0 ? "var(--high)" : "var(--text)")">
+                    @if (ChatState.VulnResults is null && !ChatState.IsScanning)
+                    {
+                        <span style="font-size:16px; font-weight:500; color:var(--text-dimmer)">Not scanned</span>
+                    }
+                    else
+                    {
+                        @_totalVulns
+                    }
+                </div>
+                <div class="stat-sub">
+                    @if (ChatState.VulnResults is not null)
+                    { @($"{_critCount} critical · {_highCount} high") }
+                    else
+                    { <button class="btn-ghost" style="font-size:11px; padding:3px 10px;" @onclick="ScanVulnerabilities">Scan now →</button> }
+                </div>
+                <div class="stat-bar">
+                    <div class="stat-bar-fill" style="width:@(ChatState.VulnResults is not null ? $"{Math.Min(100, _totalVulns * 5)}%" : "0%"); background:var(--crit)"></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Licenses</div>
+                <div class="stat-value">@_licenseCount</div>
+                <div class="stat-sub">unique license types</div>
+                <div class="stat-bar"><div class="stat-bar-fill" style="width:@(_componentCount > 0 ? $"{Math.Min(100, _licenseCount * 10)}%" : "0%"); background:var(--info)"></div></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Risk Score</div>
+                @{
+                    var riskPct = ChatState.VulnResults is null ? "—" :
+                        _critCount > 0 ? "Critical" : _highCount > 0 ? "High" :
+                        _medCount > 0 ? "Medium" : _lowCount > 0 ? "Low" : "Clean";
+                    var riskColor = ChatState.VulnResults is null ? "var(--text-dimmer)" :
+                        _critCount > 0 ? "var(--crit)" : _highCount > 0 ? "var(--high)" :
+                        _medCount > 0 ? "var(--med)" : _lowCount > 0 ? "var(--low)" : "var(--low)";
                 }
-            }
-        }
+                <div class="stat-value" style="font-size:22px; color:@riskColor">@riskPct</div>
+                <div class="stat-sub">@(ChatState.VulnResults is null ? "scan to assess" : "highest severity")</div>
+                <div class="stat-bar">
+                    <div class="stat-bar-fill" style="width:@(ChatState.VulnResults is null ? "0%" : _critCount > 0 ? "100%" : _highCount > 0 ? "75%" : _medCount > 0 ? "50%" : _lowCount > 0 ? "25%" : "10%"); background:@riskColor"></div>
+                </div>
+            </div>
+        </div>
 
-        return result;
+        @* Severity + License row *@
+        <div class="vuln-row">
+            <div class="vuln-summary">
+                <div class="card-title">Vulnerability Severity</div>
+                @if (ChatState.VulnResults is null)
+                {
+                    <div style="text-align:center; padding:20px 0; color:var(--text-dimmer); font-size:12px;">
+                        <div style="margin-bottom:12px;">No scan results yet</div>
+                        <button class="btn-primary" @onclick="ScanVulnerabilities">Scan for Vulnerabilities</button>
+                    </div>
+                }
+                else
+                {
+                    var maxSev = Math.Max(1, new[] { _critCount, _highCount, _medCount, _lowCount }.Max());
+                    <div class="sev-bars">
+                        <div class="sev-bar-row">
+                            <div class="sev-label" style="color:var(--crit)">CRITICAL</div>
+                            <div class="sev-track"><div class="sev-fill" style="width:@((double)_critCount/maxSev*100)%; background:var(--crit)"></div></div>
+                            <div class="sev-count">@_critCount</div>
+                        </div>
+                        <div class="sev-bar-row">
+                            <div class="sev-label" style="color:var(--high)">HIGH</div>
+                            <div class="sev-track"><div class="sev-fill" style="width:@((double)_highCount/maxSev*100)%; background:var(--high)"></div></div>
+                            <div class="sev-count">@_highCount</div>
+                        </div>
+                        <div class="sev-bar-row">
+                            <div class="sev-label" style="color:var(--med)">MEDIUM</div>
+                            <div class="sev-track"><div class="sev-fill" style="width:@((double)_medCount/maxSev*100)%; background:var(--med)"></div></div>
+                            <div class="sev-count">@_medCount</div>
+                        </div>
+                        <div class="sev-bar-row">
+                            <div class="sev-label" style="color:var(--low)">LOW</div>
+                            <div class="sev-track"><div class="sev-fill" style="width:@((double)_lowCount/maxSev*100)%; background:var(--low)"></div></div>
+                            <div class="sev-count">@_lowCount</div>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="license-summary">
+                <div class="card-title">License Distribution</div>
+                @if (_licenseDist.Count == 0)
+                {
+                    <div style="text-align:center; padding:20px 0; color:var(--text-dimmer); font-size:12px;">No license data found</div>
+                }
+                else
+                {
+                    var totalLicensed = _licenseDist.Values.Sum();
+                    <div class="license-list">
+                        @foreach (var kv in _licenseDist)
+                        {
+                            <div class="license-row">
+                                <div class="license-name" title="@kv.Key">@kv.Key</div>
+                                <div class="license-bar-wrap">
+                                    <div style="height:100%; border-radius:99px; background:var(--accent); width:@((double)kv.Value/totalLicensed*100)%"></div>
+                                </div>
+                                <div class="license-pct">@Math.Round((double)kv.Value/totalLicensed*100)%</div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>;
+
+    private RenderFragment RenderComponentsTab()
+    {
+        var q = _compSearch.ToLowerInvariant();
+        var rows = _componentRows.AsEnumerable();
+
+        if (!string.IsNullOrEmpty(q))
+            rows = rows.Where(r =>
+                r.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                r.Version.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                r.License.Contains(q, StringComparison.OrdinalIgnoreCase));
+
+        if (_compSevFilter is not null)
+            rows = rows.Where(r => _vulnWorstSev.GetValueOrDefault(r.Name) == _compSevFilter);
+
+        static int SevOrd(string s) => s switch { "CRITICAL" => 0, "HIGH" => 1, "MEDIUM" => 2, "LOW" => 3, "NONE" => 4, _ => 5 };
+
+        rows = _compSortCol switch
+        {
+            "version" => _compSortAsc ? rows.OrderBy(r => r.Version)    : rows.OrderByDescending(r => r.Version),
+            "type"    => _compSortAsc ? rows.OrderBy(r => r.Type)       : rows.OrderByDescending(r => r.Type),
+            "license" => _compSortAsc ? rows.OrderBy(r => r.License)    : rows.OrderByDescending(r => r.License),
+            "risk"    => _compSortAsc ? rows.OrderBy(r => SevOrd(_vulnWorstSev.GetValueOrDefault(r.Name, "NONE")))
+                                      : rows.OrderByDescending(r => SevOrd(_vulnWorstSev.GetValueOrDefault(r.Name, "NONE"))),
+            _         => _compSortAsc ? rows.OrderBy(r => r.Name)       : rows.OrderByDescending(r => r.Name),
+        };
+
+        var list = rows.ToList();
+
+        return @<div style="display:flex; flex-direction:column; height:100%; overflow:hidden;">
+            <div class="toolbar">
+                <div class="search-box">
+                    <span class="search-icon">⌕</span>
+                    <input placeholder="Search components…" value="@_compSearch"
+                           @oninput="e => _compSearch = e.Value?.ToString() ?? string.Empty" />
+                </div>
+                @foreach (var sev in new[] { "CRITICAL", "HIGH", "MEDIUM", "LOW" })
+                {
+                    var s = sev;
+                    <button class="filter-btn @(_compSevFilter == s ? "active" : "")"
+                            @onclick="() => _compSevFilter = _compSevFilter == s ? null : s">
+                        @s
+                    </button>
+                }
+                <div class="toolbar-right">
+                    <span class="count-label">@list.Count components</span>
+                </div>
+            </div>
+            <div class="content" style="overflow-y:auto; padding:0;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th @onclick='() => SortComp("name")'>Name @SortArrow("name")</th>
+                            <th @onclick='() => SortComp("version")'>Version @SortArrow("version")</th>
+                            <th @onclick='() => SortComp("type")'>Type @SortArrow("type")</th>
+                            <th @onclick='() => SortComp("license")'>License @SortArrow("license")</th>
+                            <th @onclick='() => SortComp("risk")'>Risk @SortArrow("risk")</th>
+                            <th>Vulns</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in list)
+                        {
+                            var worstSev = _vulnWorstSev.GetValueOrDefault(r.Name, "NONE");
+                            var vulnCnt  = _vulnCounts.GetValueOrDefault(r.Name, 0);
+                            <tr>
+                                <td>
+                                    <div class="td-name">@r.Name</div>
+                                    @if (!string.IsNullOrEmpty(r.Purl))
+                                    {
+                                        <div class="td-purl" title="@r.Purl">@r.Purl</div>
+                                    }
+                                </td>
+                                <td><span class="td-ver">@r.Version</span></td>
+                                <td><span class="td-type">@r.Type</span></td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(r.License))
+                                    { <span class="license-badge">@r.License</span> }
+                                    else
+                                    { <span style="color:var(--text-dimmer); font-size:11px;">—</span> }
+                                </td>
+                                <td>@SevBadge(worstSev)</td>
+                                <td>
+                                    @if (vulnCnt > 0)
+                                    { <span class="cve-count-badge">@vulnCnt CVE@(vulnCnt > 1 ? "s" : "")</span> }
+                                    else if (ChatState.VulnResults is null)
+                                    { <span style="font-size:11px; color:var(--text-dimmer)">—</span> }
+                                    else
+                                    { <span style="font-size:11px; color:var(--low)">Clean</span> }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>;
     }
 
-    private static string FormatScalar(JsonElement el) => el.ValueKind switch
+    private RenderFragment RenderVulnsTab()
     {
-        JsonValueKind.String => el.GetString() ?? "",
-        JsonValueKind.Number => el.GetRawText(),
-        JsonValueKind.True => "true",
-        JsonValueKind.False => "false",
-        JsonValueKind.Null => "(null)",
-        _ => el.GetRawText()
+        if (ChatState.IsScanning)
+        {
+            return @<div class="content fadein" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:16px;">
+                <div class="scan-running" style="padding:16px 24px; font-size:14px;">
+                    <div class="spinner" style="width:20px; height:20px; border-width:3px;"></div>
+                    Scanning @ChatState.ScanProgress / @ChatState.ScanTotal packages against OSV.dev…
+                </div>
+                <p style="font-size:12px; color:var(--text-dimmer);">All processing happens in your browser.</p>
+            </div>;
+        }
+
+        if (ChatState.VulnResults is null && ChatState.ScanError is null)
+        {
+            return @<div class="content fadein" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:16px;">
+                <div class="empty-state">
+                    <div class="empty-state-icon">⚑</div>
+                    <div class="empty-state-title">No scan results yet</div>
+                    <div style="margin-bottom:20px;">Check all @_componentCount components against the OSV.dev vulnerability database.</div>
+                    <button class="btn-primary" style="font-size:13px; padding:8px 20px;" @onclick="ScanVulnerabilities">
+                        Scan for Vulnerabilities
+                    </button>
+                    <div style="margin-top:8px; font-size:11px; color:var(--text-dimmer);">Up to 500 packages · All client-side · No data leaves your browser</div>
+                </div>
+            </div>;
+        }
+
+        var vulns = ChatState.VulnResults?
+            .SelectMany(r => r.Vulnerabilities.Select(v => (r.PackageName, r.PackageVersion, v)))
+            .OrderByDescending(x => x.v.CvssScore ?? 0)
+            .ToList() ?? [];
+
+        var q = _vulnSearch.ToLowerInvariant();
+        if (!string.IsNullOrEmpty(q))
+            vulns = vulns.Where(x => x.v.Id.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                                     x.PackageName.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (_vulnSevFilter is not null)
+            vulns = vulns.Where(x => x.v.Severity == _vulnSevFilter).ToList();
+
+        return @<div style="display:flex; flex-direction:column; height:100%; overflow:hidden;" class="fadein">
+            <div class="toolbar">
+                <div class="search-box">
+                    <span class="search-icon">⌕</span>
+                    <input placeholder="Search CVE ID or package…" value="@_vulnSearch"
+                           @oninput="e => _vulnSearch = e.Value?.ToString() ?? string.Empty" />
+                </div>
+                @foreach (var sev in new[] { "CRITICAL", "HIGH", "MEDIUM", "LOW" })
+                {
+                    var s = sev;
+                    <button class="filter-btn @(_vulnSevFilter == s ? "active" : "")"
+                            @onclick="() => _vulnSevFilter = _vulnSevFilter == s ? null : s">
+                        @s
+                    </button>
+                }
+                <div class="toolbar-right">
+                    <span class="count-label">@vulns.Count vulnerabilities</span>
+                    <button class="btn-primary" @onclick="ScanVulnerabilities" disabled="@ChatState.IsScanning">
+                        ↻ Re-scan
+                    </button>
+                </div>
+            </div>
+
+            @if (ChatState.ScanError is not null)
+            {
+                <div class="warn-banner" style="margin:12px 20px 0; background:oklch(60% 0.22 20 / 0.1); border-color:oklch(60% 0.22 20 / 0.3); color:var(--crit);">
+                    ⚠ @ChatState.ScanError
+                </div>
+            }
+            @foreach (var w in ChatState.ScanWarnings)
+            {
+                <div class="warn-banner" style="margin:4px 20px 0;">⚠ @w</div>
+            }
+
+            <div class="content" style="overflow-y:auto;">
+                @if (vulns.Count == 0 && ChatState.VulnResults is not null)
+                {
+                    <div class="empty-state">
+                        <div class="empty-state-icon" style="color:var(--low)">✓</div>
+                        <div class="empty-state-title" style="color:var(--low)">No vulnerabilities found</div>
+                        <div>All scanned packages are clean.</div>
+                    </div>
+                }
+                else
+                {
+                    <div class="vuln-list">
+                        @foreach (var (pkgName, pkgVer, vuln) in vulns)
+                        {
+                            var vid      = vuln.Id;
+                            var isExpand = _expandedVulns.Contains(vid + pkgName);
+                            var scoreCol = vuln.CvssScore.HasValue ? ScoreColor(vuln.CvssScore.Value) : "var(--text-dim)";
+                            <div class="vuln-card @(isExpand ? "expanded" : "")"
+                                 @onclick="() => ToggleVuln(vid + pkgName)">
+                                <div class="vuln-card-header">
+                                    <div>
+                                        @SevBadge(vuln.Severity ?? "NONE")
+                                        <div class="vuln-id">@vid</div>
+                                        <div class="vuln-pkg">@pkgName@@pkgVer</div>
+                                    </div>
+                                    @if (vuln.CvssScore.HasValue)
+                                    {
+                                        <div class="vuln-score" style="color:@scoreCol">@vuln.CvssScore.Value.ToString("F1")</div>
+                                    }
+                                </div>
+                                @if (isExpand)
+                                {
+                                    <div class="vuln-card-body">
+                                        @if (vuln.Summary is not null)
+                                        {
+                                            <div class="vuln-desc">@vuln.Summary</div>
+                                        }
+                                        <div class="vuln-meta-grid">
+                                            <div>
+                                                <div class="vuln-meta-label">CVE / ID</div>
+                                                <div class="vuln-meta-val">
+                                                    <a class="vuln-link" href="https://osv.dev/vulnerability/@Uri.EscapeDataString(vid)" target="_blank">
+                                                        @vid ↗
+                                                    </a>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div class="vuln-meta-label">Severity</div>
+                                                <div class="vuln-meta-val">@(vuln.Severity ?? "Unknown")@(vuln.CvssScore.HasValue ? $" ({vuln.CvssScore:F1})" : "")</div>
+                                            </div>
+                                        </div>
+                                        @if (vuln.FixedVersion is not null)
+                                        {
+                                            <div class="fix-badge">✓ Upgrade to @vuln.FixedVersion</div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>;
+    }
+
+    // ── UI helpers ─────────────────────────────────────────────────────────────
+
+    private void SortComp(string col)
+    {
+        if (_compSortCol == col) _compSortAsc = !_compSortAsc;
+        else { _compSortCol = col; _compSortAsc = true; }
+    }
+
+    private string SortArrow(string col) => _compSortCol != col ? "" : _compSortAsc ? " ↑" : " ↓";
+
+    private void ToggleVuln(string key)
+    {
+        if (!_expandedVulns.Remove(key)) _expandedVulns.Add(key);
+    }
+
+    private static RenderFragment SevBadge(string? sev)
+    {
+        var cls = (sev?.ToUpperInvariant()) switch
+        {
+            "CRITICAL" => "crit", "HIGH" => "high",
+            "MEDIUM"   => "med",  "LOW"  => "low",
+            _          => "none"
+        };
+        return @<span class="sev-badge @cls">@(sev ?? "NONE")</span>;
+    }
+
+    private static string ScoreColor(double s) =>
+        s >= 9 ? "var(--crit)" : s >= 7 ? "var(--high)" : s >= 4 ? "var(--med)" : "var(--low)";
+
+    private static string HumanizeName(string name)
+    {
+        var r = System.Text.RegularExpressions.Regex.Replace(name, "([a-z])([A-Z])", "$1 $2");
+        return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(
+            r.Replace("-", " ").Replace("_", " "));
+    }
+
+    private static string GetSectionIcon(string n) => n.ToLowerInvariant() switch
+    {
+        "metadata" or "creationinfo" => "◎",
+        "services"                   => "⬡",
+        "externalreferences"         => "⊕",
+        "dependencies" or "relationships" => "⋯",
+        "compositions"               => "⊞",
+        "vulnerabilities"            => "⚑",
+        "annotations"                => "✎",
+        "formulation"                => "⊛",
+        "declarations" or "standards"=> "⊡",
+        "properties"                 => "≡",
+        "signature"                  => "✦",
+        "files"                      => "◻",
+        _                            => "⊟"
     };
 
-
-    private static string HumanizePropertyName(string name)
+    private static string GetFormatName(SbomFormat f) => f switch
     {
-        var result = System.Text.RegularExpressions.Regex.Replace(name, "([a-z])([A-Z])", "$1 $2");
-        result = result.Replace("-", " ").Replace("_", " ");
-        return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(result);
-    }
+        SbomFormat.CycloneDX_1_6 or SbomFormat.CycloneDX_1_7 => "CycloneDX",
+        SbomFormat.SPDX_2_2 => "SPDX",
+        _ => f.ToString()
+    };
 
-    private static Icon GetSectionIcon(string propName) => propName.ToLowerInvariant() switch
+    private static string GetFormatVersion(SbomFormat f) => f switch
     {
-        "metadata" or "creationinfo" => new Icons.Regular.Size24.Tab(),
-        "components" => new Icons.Regular.Size24.Layer(),
-        "services" => new Icons.Regular.Size24.Cloud(),
-        "externalreferences" or "externalrefs" => new Icons.Regular.Size24.Globe(),
-        "dependencies" or "relationships" => new Icons.Regular.Size24.Link(),
-        "compositions" => new Icons.Regular.Size24.Grid(),
-        "vulnerabilities" => new Icons.Regular.Size24.ShieldError(),
-        "annotations" => new Icons.Regular.Size24.Comment(),
-        "formulation" => new Icons.Regular.Size24.Beaker(),
-        "declarations" => new Icons.Regular.Size24.Shield(),
-        "definitions" or "standards" => new Icons.Regular.Size24.BookOpen(),
-        "citations" => new Icons.Regular.Size24.Trophy(),
-        "properties" => new Icons.Regular.Size24.MailList(),
-        "signature" => new Icons.Regular.Size24.Signature(),
-        "packages" => new Icons.Regular.Size24.Box(),
-        "files" => new Icons.Regular.Size24.Document(),
-        _ => new Icons.Regular.Size24.List()
+        SbomFormat.CycloneDX_1_6 => "1.6",
+        SbomFormat.CycloneDX_1_7 => "1.7",
+        SbomFormat.SPDX_2_2      => "2.2",
+        _ => ""
     };
 }

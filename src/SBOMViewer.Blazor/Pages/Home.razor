@@ -9,7 +9,9 @@
 <div class="app">
     <nav class="nav">
         <div class="nav-logo">
-            <div class="nav-logo-icon">⬡</div>
+            <div class="nav-logo-icon">
+                <img src="icon-192.png" />
+            </div>
             SBOM Viewer
         </div>
 
@@ -43,13 +45,14 @@
     }
 
     <footer class="app-footer">
-        <span>© 2026 Licensed under the MIT License</span>
+        <span>© @DateTime.Now.Year Licensed under the MIT License</span>
         <span class="footer-sep">|</span>
-        <span>SBOM Viewer v@AppVersion</span>
+        <span>SBOM Viewer v@(AppVersion)</span>
         <span class="footer-sep">|</span>
-        <button class="footer-download"
-                disabled="@(SbomState.Document is null)"
-                @onclick="DownloadSbom">Download SBOM</button>
+        <FluentAnchor Href="@($"sbomviewer_{AppVersion}.json")" Download="@($"sbomviewer_{AppVersion}.json")" Appearance="Appearance.Hypertext"
+                      Class="no-icon-margin" Style="font-size:0.85rem;">
+            Download SBOM
+        </FluentAnchor>
     </footer>
 </div>
 
@@ -58,8 +61,8 @@
     private double _fontScale = 1.0;
 
     private const double FontScaleStep = 0.1;
-    private const double FontScaleMin  = 0.8;
-    private const double FontScaleMax  = 1.4;
+    private const double FontScaleMin = 0.8;
+    private const double FontScaleMax = 1.4;
 
     private string AppVersion =>
         typeof(Home).Assembly
@@ -71,7 +74,7 @@
     {
         if (firstRender)
         {
-            _theme     = await JS.InvokeAsync<string>("sbomGetTheme");
+            _theme = await JS.InvokeAsync<string>("sbomGetTheme");
             _fontScale = await JS.InvokeAsync<double>("sbomGetFontScale");
             StateHasChanged();
         }
@@ -113,8 +116,8 @@
     {
         SbomFormat.CycloneDX_1_6 => "CycloneDX 1.6",
         SbomFormat.CycloneDX_1_7 => "CycloneDX 1.7",
-        SbomFormat.SPDX_2_2      => "SPDX 2.2",
-        _                         => format.ToString()
+        SbomFormat.SPDX_2_2 => "SPDX 2.2",
+        _ => format.ToString()
     };
 
     protected override void OnInitialized()

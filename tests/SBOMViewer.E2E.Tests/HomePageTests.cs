@@ -10,38 +10,48 @@ public class HomePageTests : TestBase
         Assert.That(await Page.TitleAsync(), Does.Contain("SBOM Viewer"));
 
     [Test]
-    public async Task Header_DisplaysAppName() =>
-        // FluentHeader renders as a standard <header> element, not a web component
-        await Expect(Page.Locator("header")).ToContainTextAsync("SBOM Viewer");
+    public async Task NavBar_DisplaysAppName() =>
+        // Home.razor: <div class="nav-logo">SBOM Viewer</div>
+        await Expect(Page.Locator(".nav-logo")).ToContainTextAsync("SBOM Viewer");
 
     [Test]
-    public async Task UploadButton_IsVisible() =>
-        // <FluentButton Id="MyUploadStream">Upload SBOM</FluentButton> in UploadFile.razor
-        await Expect(Page.Locator("fluent-button#MyUploadStream")).ToBeVisibleAsync();
+    public async Task Dropzone_IsVisible() =>
+        // UploadFile.razor: <div class="dropzone ...">
+        await Expect(Page.Locator(".dropzone")).ToBeVisibleAsync();
 
     [Test]
-    public async Task SupportedFormatBadges_AreDisplayed()
+    public async Task SupportedFormatChips_AreDisplayed()
     {
-        await Expect(Page.Locator("fluent-badge", new() { HasText = "CycloneDX 1.6" })).ToBeVisibleAsync();
-        await Expect(Page.Locator("fluent-badge", new() { HasText = "CycloneDX 1.7" })).ToBeVisibleAsync();
-        await Expect(Page.Locator("fluent-badge", new() { HasText = "SPDX 2.2" })).ToBeVisibleAsync();
+        // UploadFile.razor: <span class="format-chip">@version</span> for each SupportedVersions
+        await Expect(Page.Locator(".format-chip", new() { HasText = "CycloneDX 1.6" })).ToBeVisibleAsync();
+        await Expect(Page.Locator(".format-chip", new() { HasText = "CycloneDX 1.7" })).ToBeVisibleAsync();
+        await Expect(Page.Locator(".format-chip", new() { HasText = "SPDX 2.2" })).ToBeVisibleAsync();
     }
 
     [Test]
-    public async Task NoSbomLoaded_ShowsPlaceholderCard()
+    public async Task NoSbomLoaded_ShowsUploadHero()
     {
-        // Home.razor: <FluentCard>No SBOM loaded yet. Please select a format and upload a file.</FluentCard>
-        await Expect(Page.Locator("fluent-card", new() { HasText = "No SBOM loaded yet" }))
-            .ToBeVisibleAsync();
+        // UploadFile.razor: <h1>Inspect your <span>SBOM</span><br/>in seconds.</h1>
+        await Expect(Page.Locator(".upload-hero")).ToBeVisibleAsync();
+        await Expect(Page.Locator(".upload-hero h1")).ToContainTextAsync("SBOM");
     }
 
     [Test]
     public async Task ThemeToggle_IsVisible() =>
-        // <FluentButton Title="Theme" /> in MainLayout.razor
-        await Expect(Page.Locator("fluent-button[title='Theme']")).ToBeVisibleAsync();
+        // Home.razor: <button class="theme-toggle" ...>
+        await Expect(Page.Locator("button.theme-toggle")).ToBeVisibleAsync();
 
     [Test]
-    public async Task Footer_ContainsCopyright() =>
-        // FluentFooter renders as a standard <footer> element, not a web component
-        await Expect(Page.Locator("footer")).ToContainTextAsync("SBOM Viewer v");
+    public async Task FontControls_AreVisible()
+    {
+        // Home.razor: A− / A+ font scale buttons
+        await Expect(Page.Locator(".font-controls")).ToBeVisibleAsync();
+        await Expect(Page.Locator("button.font-btn.minus")).ToBeVisibleAsync();
+        await Expect(Page.Locator("button.font-btn.plus")).ToBeVisibleAsync();
+    }
+
+    [Test]
+    public async Task Footer_ShowsAppVersion() =>
+        // Home.razor footer: <span>SBOM Viewer v@AppVersion</span>
+        await Expect(Page.Locator(".app-footer")).ToContainTextAsync("v");
 }

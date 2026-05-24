@@ -396,8 +396,6 @@ FodyWeavers.xsd
 *.msm
 *.msp
 
-# JetBrains Rider
-*.sln.iml
 # User-specific files
 .idea/
 .vscode/
@@ -455,3 +453,9 @@ publish_output/
 
 # Generated SBOM (created during CI/CD)
 src/SBOMViewer.Blazor/wwwroot/sbomviewer_*.json
+
+# claude
+.claude/settings.local.json
+
+#git
+.trees

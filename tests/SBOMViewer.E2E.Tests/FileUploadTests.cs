@@ -15,56 +15,59 @@ public class FileUploadTests : TestBase
     }
 
     [Test]
-    public async Task Upload_CycloneDX16_RendersAccordion()
+    public async Task Upload_CycloneDX16_RendersDashboard()
     {
         await UploadFile(Path.Combine(SamplesDir, "cyclonedx-1.6-minimal.json"));
-        await Expect(Page.Locator("fluent-accordion")).ToBeVisibleAsync(new() { Timeout = 15_000 });
+        // DynamicSbomViewer renders .dashboard after a successful upload
+        await Expect(Page.Locator(".dashboard")).ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
     [Test]
-    public async Task Upload_CycloneDX16_ShowsGeneralInfoSection()
+    public async Task Upload_CycloneDX16_ShowsOverviewTab()
     {
         await UploadFile(Path.Combine(SamplesDir, "cyclonedx-1.6-minimal.json"));
-        await Expect(Page.Locator("fluent-accordion-item", new() { HasText = "General Information" }))
+        // Overview is the default active tab with stat cards
+        await Expect(Page.Locator(".stats-grid")).ToBeVisibleAsync(new() { Timeout = 15_000 });
+    }
+
+    [Test]
+    public async Task Upload_CycloneDX16_ShowsComponentsSidebarItem()
+    {
+        await UploadFile(Path.Combine(SamplesDir, "cyclonedx-1.6-minimal.json"));
+        // DynamicSbomViewer: sidebar-item for Components when _componentCount > 0
+        await Expect(Page.Locator(".sidebar-item", new() { HasText = "Components" }))
             .ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
     [Test]
-    public async Task Upload_CycloneDX16_ShowsComponentsSection()
-    {
-        await UploadFile(Path.Combine(SamplesDir, "cyclonedx-1.6-minimal.json"));
-        await Expect(Page.Locator("fluent-accordion-item", new() { HasText = "Components" }))
-            .ToBeVisibleAsync(new() { Timeout = 15_000 });
-    }
-
-    [Test]
-    public async Task Upload_SPDX22_RendersAccordion()
+    public async Task Upload_SPDX22_RendersDashboard()
     {
         await UploadFile(Path.Combine(SamplesDir, "spdx-2.2-minimal.json"));
-        await Expect(Page.Locator("fluent-accordion")).ToBeVisibleAsync(new() { Timeout = 15_000 });
+        await Expect(Page.Locator(".dashboard")).ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
     [Test]
-    public async Task Upload_SPDX22_ShowsPackagesSection()
+    public async Task Upload_SPDX22_ShowsComponentsSidebarItem()
     {
         await UploadFile(Path.Combine(SamplesDir, "spdx-2.2-minimal.json"));
-        await Expect(Page.Locator("fluent-accordion-item", new() { HasText = "Packages" }).First)
+        // SPDX packages are extracted as component rows and shown under "Components" in the sidebar
+        await Expect(Page.Locator(".sidebar-item", new() { HasText = "Components" }))
             .ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
     [Test]
-    public async Task Upload_CycloneDX17_RendersAccordion()
+    public async Task Upload_CycloneDX17_RendersDashboard()
     {
         await UploadFile(Path.Combine(SamplesDir, "cyclonedx-1.7-full.json"));
-        await Expect(Page.Locator("fluent-accordion")).ToBeVisibleAsync(new() { Timeout = 15_000 });
+        await Expect(Page.Locator(".dashboard")).ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
     [Test]
     public async Task Upload_UnsupportedVersion_ShowsError()
     {
         await UploadFile(Path.Combine(SamplesDir, "cyclonedx-1.5-unsupported.json"));
-        // UploadFile.razor: errorMessage = $"Version \"...\" is not supported."
-        await Expect(Page.Locator("fluent-badge", new() { HasText = "not supported" }))
+        // UploadFile.razor: <div class="upload-error">⚠ Version "..." is not supported.</div>
+        await Expect(Page.Locator(".upload-error", new() { HasText = "not supported" }))
             .ToBeVisibleAsync(new() { Timeout = 10_000 });
     }
 
@@ -76,24 +79,29 @@ public class FileUploadTests : TestBase
         try
         {
             await UploadFile(tempPath);
-            // UploadFile.razor: errorMessage = "Unrecognized SBOM format. Please upload a valid..."
-            await Expect(Page.Locator("fluent-badge", new() { HasText = "Unrecognized SBOM format" }))
+            // UploadFile.razor: <div class="upload-error">⚠ Unrecognized SBOM format...</div>
+            await Expect(Page.Locator(".upload-error", new() { HasText = "Unrecognized SBOM format" }))
                 .ToBeVisibleAsync(new() { Timeout = 10_000 });
         }
         finally { File.Delete(tempPath); }
     }
 
     [Test]
-    public async Task Search_InComponentsSection_FiltersResults()
+    public async Task Search_InComponentsTab_FiltersResults()
     {
-        // cyclonedx-1.6-full.json has enough components to trigger FluentSearch (>5 items)
+        // cyclonedx-1.6-full.json contains .NET packages — "json" matches Newtonsoft.Json
         await UploadFile(Path.Combine(SamplesDir, "cyclonedx-1.6-full.json"));
-        await Page.Locator("fluent-accordion-item", new() { HasText = "Components" }).ClickAsync();
-        var searchBox = Page.Locator("fluent-search").First;
-        await Expect(searchBox).ToBeVisibleAsync(new() { Timeout = 15_000 });
-        // fluent-search is a web component — fill its inner <input> directly
-        await searchBox.Locator("input").FillAsync("express");
-        // Verify some filtered results remain visible
-        Assert.That(await Page.Locator("details:visible").CountAsync(), Is.GreaterThan(0));
+        await Expect(Page.Locator(".dashboard")).ToBeVisibleAsync(new() { Timeout = 15_000 });
+
+        // Navigate to the Components tab via the sidebar
+        await Page.Locator(".sidebar-item", new() { HasText = "Components" }).ClickAsync();
+
+        // The toolbar search box is a plain <input> inside .search-box
+        var searchInput = Page.Locator(".search-box input").First;
+        await Expect(searchInput).ToBeVisibleAsync(new() { Timeout = 10_000 });
+        await searchInput.FillAsync("json");
+
+        // Use Expect (auto-waits for Blazor re-render) to confirm at least one row is visible
+        await Expect(Page.Locator(".data-table tbody tr").First).ToBeVisibleAsync(new() { Timeout = 5_000 });
     }
 }
