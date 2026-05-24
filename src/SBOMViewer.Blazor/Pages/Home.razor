@@ -2,8 +2,36 @@
 @implements IDisposable
 @inject SbomState SbomState
 @inject ChatState ChatState
+@inject IJSRuntime JS
+@using System.Reflection
+@using SBOMViewer.Blazor.Models
 
-<FluentStack Orientation="Orientation.Vertical" Style="gap:1.5rem;">
+<div class="app">
+    <nav class="nav">
+        <div class="nav-logo">
+            <div class="nav-logo-icon">
+                <img src="icon-192.png" />
+            </div>
+            SBOM Viewer
+        </div>
+
+        <div class="nav-actions">
+            <div class="font-controls">
+                <button class="font-btn minus" @onclick="DecreaseFontSize" disabled="@(_fontScale <= 0.8)" title="Decrease font size">A−</button>
+                <div class="font-divider"></div>
+                <button class="font-btn plus" @onclick="IncreaseFontSize" disabled="@(_fontScale >= 1.4)" title="Increase font size">A+</button>
+            </div>
+
+            <button class="theme-toggle" @onclick="ToggleTheme" title="@(_theme == "dark" ? "Switch to light mode" : "Switch to dark mode")">
+                @(_theme == "dark" ? "☀" : "☽")
+            </button>
+
+            @if (SbomState.Document is not null)
+            {
+                <button class="btn-ghost" @onclick="NewFile">← New file</button>
+            }
+        </div>
+    </nav>
 
     @if (SbomState.Document is not null && SbomState.Schema is not null)
     {
@@ -13,27 +41,84 @@
     }
     else
     {
-        <FluentCard Style="padding:1rem; text-align:center; color:var(--neutral-foreground-2);">
-            No SBOM loaded yet. Please select a format and upload a file.
-
-            @if (_betaBannerVisible)
-            {
-                <div class="beta-banner" style="margin-top:1rem; border-radius:0.375rem;">
-                    <span>
-                        <span class="beta-badge">&#x26A1; BETA</span>
-                        Try WebLLM beta features integration at
-                        <a href="https://staging.sbomviewer.com" target="_blank" rel="noopener noreferrer">staging.sbomviewer.com</a>
-                    </span>
-                    <button class="beta-banner-dismiss" @onclick="() => _betaBannerVisible = false" title="Dismiss" aria-label="Dismiss beta banner">&#x2715;</button>
-                </div>
-            }
-        </FluentCard>
+        <UploadFile />
     }
 
-</FluentStack>
+    <footer class="app-footer">
+        <span>© @DateTime.Now.Year Licensed under the MIT License</span>
+        <span class="footer-sep">|</span>
+        <span>SBOM Viewer v@(AppVersion)</span>
+        <span class="footer-sep">|</span>
+        <FluentAnchor Href="@($"sbomviewer_{AppVersion}.json")" Download="@($"sbomviewer_{AppVersion}.json")" Appearance="Appearance.Hypertext"
+                      Class="no-icon-margin" Style="font-size:0.85rem;">
+            Download SBOM
+        </FluentAnchor>
+    </footer>
+</div>
 
 @code {
-    private bool _betaBannerVisible = true;
+    private string _theme = "dark";
+    private double _fontScale = 1.0;
+
+    private const double FontScaleStep = 0.1;
+    private const double FontScaleMin = 0.8;
+    private const double FontScaleMax = 1.4;
+
+    private string AppVersion =>
+        typeof(Home).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion.Split('+')[0]
+        ?? "unknown";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _theme = await JS.InvokeAsync<string>("sbomGetTheme");
+            _fontScale = await JS.InvokeAsync<double>("sbomGetFontScale");
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleTheme()
+    {
+        _theme = _theme == "dark" ? "light" : "dark";
+        await JS.InvokeVoidAsync("sbomSetTheme", _theme);
+    }
+
+    private async Task IncreaseFontSize()
+    {
+        _fontScale = Math.Min(FontScaleMax, Math.Round(_fontScale + FontScaleStep, 1));
+        await JS.InvokeVoidAsync("sbomSetFontScale", _fontScale);
+    }
+
+    private async Task DecreaseFontSize()
+    {
+        _fontScale = Math.Max(FontScaleMin, Math.Round(_fontScale - FontScaleStep, 1));
+        await JS.InvokeVoidAsync("sbomSetFontScale", _fontScale);
+    }
+
+    private void NewFile()
+    {
+        SbomState.Clear();
+        ChatState.ClearVulnerabilities();
+    }
+
+    private async Task DownloadSbom()
+    {
+        if (SbomState.Document is null) return;
+        var json = SbomState.Document.RootElement.GetRawText();
+        var filename = string.IsNullOrWhiteSpace(SbomState.FileName) ? "sbom.json" : SbomState.FileName;
+        await JS.InvokeVoidAsync("sbomDownloadFile", filename, json);
+    }
+
+    private static string FormatDisplay(SbomFormat format) => format switch
+    {
+        SbomFormat.CycloneDX_1_6 => "CycloneDX 1.6",
+        SbomFormat.CycloneDX_1_7 => "CycloneDX 1.7",
+        SbomFormat.SPDX_2_2 => "SPDX 2.2",
+        _ => format.ToString()
+    };
 
     protected override void OnInitialized()
     {

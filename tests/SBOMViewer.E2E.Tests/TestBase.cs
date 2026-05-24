@@ -12,7 +12,7 @@ public abstract class TestBase : PageTest
     {
         BaseUrl = Environment.GetEnvironmentVariable("BASE_URL") ?? "http://localhost:5000";
         await Page.GotoAsync(BaseUrl);
-        // Wait for Blazor WASM to bootstrap — fluent-toolbar is always present in MainLayout.razor
-        await Page.WaitForSelectorAsync("fluent-toolbar", new() { Timeout = 30_000 });
+        // Wait for Blazor WASM to bootstrap — .nav is always present in Home.razor
+        await Page.WaitForSelectorAsync(".nav", new() { Timeout = 30_000 });
     }
 }
