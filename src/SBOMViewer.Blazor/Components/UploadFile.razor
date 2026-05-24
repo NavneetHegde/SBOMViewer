@@ -15,19 +15,13 @@
          style="animation-delay:0.1s; position:relative;"
          @ondragenter="OnDragEnter"
          @ondragleave="OnDragLeave"
-         @ondragover:preventDefault="true">
+         @ondragover:preventDefault="true"
+         @ondrop="OnDrop">
 
-        <!-- Invisible FluentInputFile trigger covering the entire dropzone -->
-        <FluentInputFile AnchorId="sbom-upload-btn"
-                         DragDropZoneVisible="false"
-                         Mode="InputFileMode.Stream"
-                         Multiple="false"
-                         MaximumFileSize="@(20 * 1024 * 1024)"
-                         Accept=".json"
-                         OnCompleted="@OnCompleted" />
-        <button id="sbom-upload-btn"
-                style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2; border:none; background:none; width:100%; height:100%;">
-        </button>
+        <!-- InputFile covers entire dropzone — handles both click-to-browse and drag-and-drop -->
+        <InputFile style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2; width:100%; height:100%;"
+                   accept=".json"
+                   OnChange="OnFileChanged" />
 
         <!-- Visual content -->
         <div style="position:relative; z-index:1; pointer-events:none; display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; width:100%;">
@@ -67,10 +61,26 @@
 
     private void OnDragEnter() => _dragCounter++;
     private void OnDragLeave() { _dragCounter = Math.Max(0, _dragCounter - 1); }
+    private void OnDrop() => _dragCounter = 0;
 
-    private async Task OnCompleted(IEnumerable<FluentInputFileEventArgs> files)
+    private async Task OnFileChanged(InputFileChangeEventArgs e)
     {
-        if (files == null || !files.Any()) return;
+        var file = e.File;
+        if (file == null) return;
+
+        if (file.Size > 20 * 1024 * 1024)
+        {
+            _errorMessage = "File size exceeds the 20MB limit.";
+            StateHasChanged();
+            return;
+        }
+
+        if (!file.Name.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+        {
+            _errorMessage = "Only .json files are supported.";
+            StateHasChanged();
+            return;
+        }
 
         _isLoading = true;
         _errorMessage = null;
@@ -78,11 +88,10 @@
         ChatState.ClearVulnerabilities();
         StateHasChanged();
 
-        foreach (var file in files)
+        try
         {
-            if (file?.Stream == null) continue;
-
-            using var reader = new StreamReader(file.Stream);
+            using var stream = file.OpenReadStream(20 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
             string content = await reader.ReadToEndAsync();
 
             var result = SbomFormatDetector.DetectWithDetails(content);
@@ -130,8 +139,10 @@
                 }
             }
         }
-
-        _isLoading = false;
-        StateHasChanged();
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
     }
 }
