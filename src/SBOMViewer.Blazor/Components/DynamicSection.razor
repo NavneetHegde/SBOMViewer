@@ -1,5 +1,4 @@
 @using System.Text.Json
-@using Microsoft.FluentUI.AspNetCore.Components
 @using SBOMViewer.Blazor.Models
 
 @if (Element.ValueKind == JsonValueKind.Array)
@@ -10,12 +9,16 @@
     <div style="display:flex; flex-direction:column; gap:0.5rem;">
         @if (isSearchable)
         {
-            <FluentSearch @bind-Value="searchText" Style="width:100%"
-                          Placeholder="@($"Search {Schema?.Title ?? PropertyName}")"
-                          AutoComplete="off" />
+            <div class="search-box" style="max-width:100%; margin-bottom:0.5rem;">
+                <span class="search-icon">⌕</span>
+                <input value="@searchText"
+                       @oninput="e => searchText = e.Value?.ToString() ?? string.Empty"
+                       placeholder="@($"Search {Schema?.Title ?? PropertyName}")"
+                       autocomplete="off" />
+            </div>
         }
 
-        <div class="scroll-container" style="max-height:400px; overflow-y:auto; padding-right:0.5rem;">
+        <div class="scroll-container" style="padding-right:0.5rem;">
             @foreach (var item in FilterArrayItems(Element, searchText))
             {
                 @if (item.ValueKind == JsonValueKind.Object)

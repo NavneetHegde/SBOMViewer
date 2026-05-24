@@ -3,6 +3,8 @@
 [Oo]bj/
 publish/
 publish_output/
+*.bak
+*.tmp
 
 # Visual Studio
 .vs/
@@ -13,6 +15,11 @@ publish_output/
 *.user
 *.suo
 
+# Version control
+.git/
+.gitignore
+.gitattributes
+
 # Images
 *.jpeg
 *.png
@@ -21,8 +28,50 @@ publish_output/
 # NuGet
 **/[Pp]ackages/
 
+# IDE specific
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
 # Git
 .git/
+
+# Cache and temp
+**/.cache/
+**/temp/
+**/tmp/
+
+# Large files
+*.mp4
+*.mov
+*.avi
+*.zip
+*.tar.gz
+*.rar
+node_modules/
+packages/
+
+# Credentials and authentication
+.aws/
+.azure/
+.kube/
+.ssh/
+credentials.json
+config.yaml
+
+# Secrets and configuration
+.env
+.env.local
+.env.*.json
+.secrets/
+secrets/
+**/*.key
+**/*.pem
+**/*.pfx
+**/*.p12
+appsettings.*.json
 
 # Blazor WASM build output
 wwwroot/_framework/

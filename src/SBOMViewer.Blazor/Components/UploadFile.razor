@@ -3,67 +3,78 @@
 @inject SchemaService SchemaService
 @inject ChatState ChatState
 
-<!-- Container -->
-<FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center" Style="max-width:800px; margin:auto; padding:1rem; gap:0.5rem;">
+<div class="upload-screen">
+    <div class="upload-grid"></div>
 
-    <FluentStack Orientation="Orientation.Horizontal" HorizontalAlignment="HorizontalAlignment.Center" Style="gap:1rem;">
-        <!-- File Upload -->
-        <FluentInputFile AnchorId="MyUploadStream"
+    <div class="upload-hero fadein">
+        <h1>Inspect your <span>SBOM</span><br />in seconds.</h1>
+        <p>Upload any Software Bill of Materials file. Vulnerabilities, licenses, and dependencies — all in one place.</p>
+    </div>
+
+    <div class="dropzone @(_drag ? "dragover" : "") fadein"
+         style="animation-delay:0.1s; position:relative;"
+         @ondragenter="OnDragEnter"
+         @ondragleave="OnDragLeave"
+         @ondragover:preventDefault="true">
+
+        <!-- Invisible FluentInputFile trigger covering the entire dropzone -->
+        <FluentInputFile AnchorId="sbom-upload-btn"
                          DragDropZoneVisible="false"
                          Mode="InputFileMode.Stream"
                          Multiple="false"
                          MaximumFileSize="@(20 * 1024 * 1024)"
                          Accept=".json"
                          OnCompleted="@OnCompleted" />
+        <button id="sbom-upload-btn"
+                style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2; border:none; background:none; width:100%; height:100%;">
+        </button>
 
-        <FluentButton Appearance="Appearance.Accent" Id="MyUploadStream">
-            Upload SBOM
-        </FluentButton>
-    </FluentStack>
-
-    <!-- Supported formats -->
-    <div style="display:flex; justify-content:center; gap:0.4rem; flex-wrap:wrap;">
-        <span style="font-size:0.8rem; color:var(--neutral-foreground-hint);">Supported:</span>
-        @foreach (var version in SbomFormatDetector.SupportedVersions)
-        {
-            <FluentBadge Appearance="Appearance.Neutral" Style="font-size:0.75rem;">@version</FluentBadge>
-        }
+        <!-- Visual content -->
+        <div style="position:relative; z-index:1; pointer-events:none; display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; width:100%;">
+            <div class="dropzone-icon">📄</div>
+            <h3>Drop SBOM file here</h3>
+            <p>or click to browse your files</p>
+            <div class="dropzone-formats">
+                @foreach (var version in SbomFormatDetector.SupportedVersions)
+                {
+                    <span class="format-chip">@version</span>
+                }
+                <span class="format-chip">JSON</span>
+            </div>
+        </div>
     </div>
-    @if (!string.IsNullOrEmpty(errorMessage))
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
     {
-        <div style="text-align:center; padding:0.5rem;">
-            <FluentBadge Appearance="Appearance.Lightweight" Color="Color.Error">@errorMessage</FluentBadge>
+        <div class="upload-error fadein">⚠ @_errorMessage</div>
+    }
+
+    @if (_isLoading)
+    {
+        <div style="position:fixed; top:0; left:0; right:0; bottom:0; background:oklch(11% 0.018 240 / 0.85); display:flex; flex-direction:column; justify-content:center; align-items:center; gap:16px; z-index:1000;">
+            <div class="spinner" style="width:32px; height:32px; border-width:3px;"></div>
+            <span style="color:var(--text-dim); font-size:13px;">Parsing SBOM…</span>
         </div>
     }
-</FluentStack>
-
-
-@if (isLoading)
-{
-    <div style="
-                position:fixed;
-                top:0; left:0; right:0; bottom:0;
-                background-color:rgba(0,0,0,0.5);
-                display:flex;
-                justify-content:center;
-                align-items:center;
-                z-index:1000;">
-        <FluentProgress Min="0" Max="100" Value="0" IsIndeterminate="true" />
-        <span style="color:white; margin-left:1rem;">Loading SBOM...</span>
-    </div>
-}
+</div>
 
 @code {
+    private bool _isLoading;
+    private string? _errorMessage;
+    private int _dragCounter;
 
-    private bool isLoading = false;
-    private string? errorMessage;
+    private bool _drag => _dragCounter > 0;
 
-    async Task OnCompleted(IEnumerable<FluentInputFileEventArgs> files)
+    private void OnDragEnter() => _dragCounter++;
+    private void OnDragLeave() { _dragCounter = Math.Max(0, _dragCounter - 1); }
+
+    private async Task OnCompleted(IEnumerable<FluentInputFileEventArgs> files)
     {
         if (files == null || !files.Any()) return;
 
-        isLoading = true;
-        errorMessage = null;
+        _isLoading = true;
+        _errorMessage = null;
+        _dragCounter = 0;
         ChatState.ClearVulnerabilities();
         StateHasChanged();
 
@@ -78,12 +89,12 @@
 
             if (result.IsUnsupportedVersion)
             {
-                errorMessage = $"Version \"{result.DetectedVersion}\" is not supported. Supported versions: {string.Join(", ", SbomFormatDetector.SupportedVersions)}.";
+                _errorMessage = $"Version \"{result.DetectedVersion}\" is not supported. Supported versions: {string.Join(", ", SbomFormatDetector.SupportedVersions)}.";
                 SbomState.Clear();
             }
             else if (result.Format == null)
             {
-                errorMessage = "Unrecognized SBOM format. Please upload a valid CycloneDX or SPDX JSON file.";
+                _errorMessage = "Unrecognized SBOM format. Please upload a valid CycloneDX or SPDX JSON file.";
                 SbomState.Clear();
             }
             else
@@ -96,11 +107,10 @@
                         AllowTrailingCommas = true
                     });
 
-                    // Lightweight validation of required fields
                     var validationError = SbomFormatDetector.Validate(jsonDoc.RootElement, result.Format.Value);
                     if (validationError != null)
                     {
-                        errorMessage = validationError;
+                        _errorMessage = validationError;
                         jsonDoc.Dispose();
                         SbomState.Clear();
                     }
@@ -110,18 +120,18 @@
                         SbomState.Schema = schema;
                         SbomState.DetectedFormat = result.Format;
                         SbomState.FileName = file.Name;
-                        SbomState.Document = jsonDoc; // Triggers notification
+                        SbomState.Document = jsonDoc;
                     }
                 }
                 catch (JsonException)
                 {
-                    errorMessage = "Failed to parse JSON content.";
+                    _errorMessage = "Failed to parse JSON. Please check the file is valid JSON.";
                     SbomState.Clear();
                 }
             }
         }
 
-        isLoading = false;
+        _isLoading = false;
         StateHasChanged();
     }
 }

@@ -1,6 +1,5 @@
 @using System.Text.Json
 @using System.Text.RegularExpressions
-@using Microsoft.FluentUI.AspNetCore.Components
 @using SBOMViewer.Blazor.Models
 
 @if (Element.ValueKind == JsonValueKind.Object)
@@ -30,7 +29,7 @@
                         <span style="display:inline-flex; flex-wrap:wrap; gap:0.3rem; margin-left:0.3rem;">
                             @foreach (var item in prop.Value.EnumerateArray())
                             {
-                                <FluentBadge Appearance="Appearance.Neutral">@item.GetString()</FluentBadge>
+                                <span class="license-badge">@item.GetString()</span>
                             }
                         </span>
                     </div>
