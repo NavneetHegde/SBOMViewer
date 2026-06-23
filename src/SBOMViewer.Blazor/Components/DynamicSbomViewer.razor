@@ -5,6 +5,7 @@
 @inject ChatState ChatState
 @inject VulnerabilityService VulnService
 @inject SbomState SbomState
+@inject IJSRuntime JS
 
 @* ── Scan overlay ── *@
 @if (ChatState.IsScanning)
@@ -52,6 +53,19 @@
                 }
             </button>
 
+            @if (_componentCount > 0)
+            {
+                <button class="sidebar-item @(_activeTab == "compliance" ? "active" : "")"
+                        @onclick='() => SetTab("compliance")'>
+                    <span class="si-icon">⚖</span>
+                    <span class="si-label">Compliance</span>
+                    @if (_strongCopyleftCount + _unknownLicenseCount > 0)
+                    {
+                        <span class="si-count" style="color:var(--med); background:oklch(78% 0.18 80 / 0.12);">@(_strongCopyleftCount + _unknownLicenseCount)</span>
+                    }
+                </button>
+            }
+
             @if (_dynamicSections.Count > 0)
             {
                 <div class="sidebar-section" style="margin-top:8px;">Sections</div>
@@ -87,6 +101,10 @@
                 }
                 <div class="sbom-meta-row"><span>Components</span><span>@_componentCount</span></div>
             </div>
+
+            <button class="btn-ghost" style="margin:10px 12px 0; width:calc(100% - 24px);" @onclick="ExportReport">
+                ⤓ Export Report
+            </button>
         </div>
 
         @* ── Main area ── *@
@@ -103,6 +121,10 @@
             {
                 @RenderVulnsTab()
             }
+            else if (_activeTab == "compliance")
+            {
+                @RenderComplianceTab()
+            }
             else if (_dynamicSections.TryGetValue(_activeTab, out var dynSec))
             {
                 <div class="tab-bar">
@@ -116,6 +138,115 @@
                 </div>
             }
         </div>
+    </div>
+
+    @* ── Printable report (screen-hidden, shown only via @media print) ── *@
+    <div class="print-report">
+        <h1>SBOM Compliance Report</h1>
+        <div class="print-meta">
+            <div><strong>File:</strong> @FileName</div>
+            @if (SbomState.DetectedFormat is not null)
+            {
+                <div><strong>Format:</strong> @GetFormatName(SbomState.DetectedFormat.Value) @GetFormatVersion(SbomState.DetectedFormat.Value)</div>
+            }
+            @if (_generatedDate is not null)
+            {
+                <div><strong>SBOM generated:</strong> @_generatedDate</div>
+            }
+            <div><strong>Report exported:</strong> @DateTime.Now.ToString("yyyy-MM-dd HH:mm")</div>
+            <div><strong>Total components:</strong> @_componentCount</div>
+        </div>
+
+        <h2>Vulnerability Summary</h2>
+        @if (ChatState.VulnResults is null)
+        {
+            <p>No vulnerability scan has been run for this SBOM.</p>
+        }
+        else
+        {
+            <p>@_totalVulns total vulnerabilities — @_critCount critical, @_highCount high, @_medCount medium, @_lowCount low.</p>
+            @if (_totalVulns > 0)
+            {
+                <table class="print-table">
+                    <thead>
+                        <tr><th>Package</th><th>CVE / ID</th><th>Severity</th><th>CVSS</th><th>Fixed Version</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in ChatState.VulnResults)
+                        {
+                            @foreach (var v in r.Vulnerabilities)
+                            {
+                                <tr>
+                                    <td>@r.PackageName@@@r.PackageVersion</td>
+                                    <td>@v.Id</td>
+                                    <td>@(v.Severity ?? "Unknown")</td>
+                                    <td>@(v.CvssScore?.ToString("F1") ?? "—")</td>
+                                    <td>@(v.FixedVersion ?? "—")</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            }
+        }
+
+        <h2>License Compliance Summary</h2>
+        <p>
+            @_permissiveCount permissive · @_weakCopyleftCount weak copyleft ·
+            @_strongCopyleftCount strong copyleft · @_unknownLicenseCount unknown/unclear
+        </p>
+        @{
+            var flaggedLicenseRows = _componentRows.Where(r => r.Risk is LicenseRisk.StrongCopyleft or LicenseRisk.Unknown).OrderBy(r => r.Name).ToList();
+        }
+        @if (flaggedLicenseRows.Count == 0)
+        {
+            <p>No strong-copyleft or unrecognized licenses found.</p>
+        }
+        else
+        {
+            <table class="print-table">
+                <thead>
+                    <tr><th>Component</th><th>Version</th><th>License</th><th>Risk</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in flaggedLicenseRows)
+                    {
+                        <tr>
+                            <td>@r.Name</td>
+                            <td>@r.Version</td>
+                            <td>@(string.IsNullOrEmpty(r.License) ? "—" : r.License)</td>
+                            <td>@r.Risk</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <h2>License Distribution</h2>
+        @if (_licenseDist.Count == 0)
+        {
+            <p>No license data found.</p>
+        }
+        else
+        {
+            <table class="print-table">
+                <thead><tr><th>License</th><th>Components</th></tr></thead>
+                <tbody>
+                    @foreach (var kv in _licenseDist)
+                    {
+                        <tr><td>@kv.Key</td><td>@kv.Value</td></tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <p class="print-disclaimer">
+            This report is generated automatically from SBOM metadata (CycloneDX or SPDX) and the OSV.dev vulnerability database.
+            License risk categories are derived from a curated license-identifier lookup and may not reflect a complete
+            or compatible license analysis (e.g. compound license expressions, custom license text). This report is
+            provided for informational purposes only, does not constitute legal advice, and should not be relied upon
+            as a substitute for review by qualified legal counsel.
+        </p>
     </div>
 }
 
@@ -133,6 +264,7 @@
     private int _totalVulns;
     private int _critCount, _highCount, _medCount, _lowCount;
     private Dictionary<string, int> _licenseDist = [];
+    private int _permissiveCount, _weakCopyleftCount, _strongCopyleftCount, _unknownLicenseCount;
 
     // Component data
     private List<ComponentRow> _componentRows = [];
@@ -150,10 +282,13 @@
     private string? _vulnSevFilter = null;
     private HashSet<string> _expandedVulns = [];
 
+    // Compliance tab state
+    private string       _complianceSearch    = "";
+    private LicenseRisk? _complianceRiskFilter = null;
+
     // Dynamic sidebar sections
     private Dictionary<string, DynSection> _dynamicSections = [];
 
-    private record ComponentRow(string Name, string Version, string Type, string License, string? Purl);
     private record DynSection(string Label, string Icon, int Count, JsonElement Element, SchemaNode? Schema);
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -181,11 +316,13 @@
 
     private void SetTab(string tab) { _activeTab = tab; }
 
+    private async Task ExportReport() => await JS.InvokeVoidAsync("sbomPrintReport");
+
     // ── Data derivation ────────────────────────────────────────────────────────
 
     private void BuildDerivedData()
     {
-        _componentRows = ExtractComponentRows();
+        _componentRows = ComponentRowExtractor.Extract(RootElement, SbomState.DetectedFormat);
         _componentCount = _componentRows.Count;
 
         var licGroups = _componentRows
@@ -195,6 +332,11 @@
             .ToList();
         _licenseCount = licGroups.Count;
         _licenseDist  = licGroups.Take(5).ToDictionary(g => g.Key, g => g.Count());
+
+        _permissiveCount     = _componentRows.Count(r => r.Risk == LicenseRisk.Permissive);
+        _weakCopyleftCount   = _componentRows.Count(r => r.Risk == LicenseRisk.WeakCopyleft);
+        _strongCopyleftCount = _componentRows.Count(r => r.Risk == LicenseRisk.StrongCopyleft);
+        _unknownLicenseCount = _componentRows.Count(r => r.Risk == LicenseRisk.Unknown);
 
         _generatedDate = ExtractGeneratedDate();
         BuildDynamicSections();
@@ -232,68 +374,6 @@
     }
 
     // ── JSON extraction ────────────────────────────────────────────────────────
-
-    private List<ComponentRow> ExtractComponentRows()
-    {
-        var rows = new List<ComponentRow>();
-        var format = SbomState.DetectedFormat;
-
-        if (format is SbomFormat.CycloneDX_1_6 or SbomFormat.CycloneDX_1_7)
-        {
-            if (!RootElement.TryGetProperty("components", out var comps) ||
-                comps.ValueKind != JsonValueKind.Array) return rows;
-
-            foreach (var comp in comps.EnumerateArray())
-            {
-                var name    = comp.TryGetProperty("name",    out var n) ? n.GetString() ?? "" : "";
-                var version = comp.TryGetProperty("version", out var v) ? v.GetString() ?? "" : "";
-                var type    = comp.TryGetProperty("type",    out var t) ? t.GetString() ?? "" : "";
-                var purl    = comp.TryGetProperty("purl",    out var p) ? p.GetString()      : null;
-                var license = "";
-                if (comp.TryGetProperty("licenses", out var lics) && lics.ValueKind == JsonValueKind.Array)
-                {
-                    var first = lics.EnumerateArray().FirstOrDefault();
-                    if (first.ValueKind == JsonValueKind.Object)
-                    {
-                        if (first.TryGetProperty("license", out var lic) && lic.TryGetProperty("id", out var lid))
-                            license = lid.GetString() ?? "";
-                        else if (first.TryGetProperty("expression", out var expr))
-                            license = expr.GetString() ?? "";
-                    }
-                }
-                if (!string.IsNullOrEmpty(name))
-                    rows.Add(new ComponentRow(name, version, type, license, purl));
-            }
-        }
-        else if (format is SbomFormat.SPDX_2_2)
-        {
-            if (!RootElement.TryGetProperty("packages", out var pkgs) ||
-                pkgs.ValueKind != JsonValueKind.Array) return rows;
-
-            foreach (var pkg in pkgs.EnumerateArray())
-            {
-                var name    = pkg.TryGetProperty("name",             out var n) ? n.GetString() ?? "" : "";
-                var version = pkg.TryGetProperty("versionInfo",      out var v) ? v.GetString() ?? "" : "";
-                var license = pkg.TryGetProperty("licenseConcluded", out var l) ? l.GetString() ?? "" : "";
-                if (license is "NOASSERTION" or "NONE") license = "";
-                string? purl = null;
-                if (pkg.TryGetProperty("externalRefs", out var refs) && refs.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var r in refs.EnumerateArray())
-                    {
-                        if (r.TryGetProperty("referenceCategory", out var cat) &&
-                            r.TryGetProperty("referenceLocator",  out var loc) &&
-                            cat.GetString() is "PACKAGE-MANAGER" or "PACKAGE_MANAGER")
-                        { purl = loc.GetString(); break; }
-                    }
-                }
-                if (!string.IsNullOrEmpty(name))
-                    rows.Add(new ComponentRow(name, version, "package", license, purl));
-            }
-        }
-
-        return rows;
-    }
 
     private string? ExtractGeneratedDate()
     {
@@ -386,13 +466,13 @@
     @<div class="content fadein">
         @* Stats grid *@
         <div class="stats-grid">
-            <div class="stat-card">
+            <div class="stat-card clickable" @onclick='() => SetTab("components")'>
                 <div class="stat-label">Components</div>
                 <div class="stat-value">@_componentCount</div>
                 <div class="stat-sub">in this SBOM</div>
                 <div class="stat-bar"><div class="stat-bar-fill" style="width:100%; background:var(--accent)"></div></div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card clickable" @onclick='() => SetTab("vulns")'>
                 <div class="stat-label">Vulnerabilities</div>
                 <div class="stat-value" style="color:@(_critCount > 0 ? "var(--crit)" : _totalVulns > 0 ? "var(--high)" : "var(--text)")">
                     @if (ChatState.VulnResults is null && !ChatState.IsScanning)
@@ -414,7 +494,7 @@
                     <div class="stat-bar-fill" style="width:@(ChatState.VulnResults is not null ? $"{Math.Min(100, _totalVulns * 5)}%" : "0%"); background:var(--crit)"></div>
                 </div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card clickable" @onclick='() => SetTab("compliance")'>
                 <div class="stat-label">Licenses</div>
                 <div class="stat-value">@_licenseCount</div>
                 <div class="stat-sub">unique license types</div>
@@ -440,7 +520,7 @@
 
         @* Severity + License row *@
         <div class="vuln-row">
-            <div class="vuln-summary">
+            <div class="vuln-summary clickable" @onclick='() => SetTab("vulns")'>
                 <div class="card-title">Vulnerability Severity</div>
                 @if (ChatState.VulnResults is null)
                 {
@@ -476,7 +556,7 @@
                     </div>
                 }
             </div>
-            <div class="license-summary">
+            <div class="license-summary clickable" @onclick='() => SetTab("compliance")'>
                 <div class="card-title">License Distribution</div>
                 @if (_licenseDist.Count == 0)
                 {
@@ -595,6 +675,121 @@
                         }
                     </tbody>
                 </table>
+            </div>
+        </div>;
+    }
+
+    private RenderFragment RenderComplianceTab()
+    {
+        var q = _complianceSearch.ToLowerInvariant();
+        var flagged = _componentRows.Where(r => r.Risk is LicenseRisk.StrongCopyleft or LicenseRisk.Unknown).AsEnumerable();
+
+        if (!string.IsNullOrEmpty(q))
+            flagged = flagged.Where(r =>
+                r.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                r.License.Contains(q, StringComparison.OrdinalIgnoreCase));
+
+        if (_complianceRiskFilter is not null)
+            flagged = flagged.Where(r => r.Risk == _complianceRiskFilter);
+
+        var list = flagged.OrderBy(r => r.Name).ToList();
+
+        return @<div style="display:flex; flex-direction:column; height:100%; overflow:hidden;" class="fadein">
+            <div class="toolbar">
+                <div class="search-box">
+                    <span class="search-icon">⌕</span>
+                    <input placeholder="Search flagged components…" value="@_complianceSearch"
+                           @oninput="e => _complianceSearch = e.Value?.ToString() ?? string.Empty" />
+                </div>
+                <button class="filter-btn @(_complianceRiskFilter == LicenseRisk.StrongCopyleft ? "active" : "")"
+                        @onclick="() => _complianceRiskFilter = _complianceRiskFilter == LicenseRisk.StrongCopyleft ? null : LicenseRisk.StrongCopyleft">
+                    STRONG COPYLEFT
+                </button>
+                <button class="filter-btn @(_complianceRiskFilter == LicenseRisk.Unknown ? "active" : "")"
+                        @onclick="() => _complianceRiskFilter = _complianceRiskFilter == LicenseRisk.Unknown ? null : LicenseRisk.Unknown">
+                    UNKNOWN
+                </button>
+                <div class="toolbar-right">
+                    <span class="count-label">@list.Count flagged of @_componentCount components</span>
+                </div>
+            </div>
+
+            <div class="content" style="overflow-y:auto;">
+                <div class="stats-grid" style="margin-bottom:20px;">
+                    <div class="stat-card">
+                        <div class="stat-label">Permissive</div>
+                        <div class="stat-value" style="color:var(--low)">@_permissiveCount</div>
+                        <div class="stat-sub">MIT, Apache-2.0, BSD…</div>
+                        <div class="stat-bar"><div class="stat-bar-fill" style="width:@StatPct(_permissiveCount)%; background:var(--low)"></div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Weak Copyleft</div>
+                        <div class="stat-value" style="color:var(--med)">@_weakCopyleftCount</div>
+                        <div class="stat-sub">LGPL, MPL, EPL…</div>
+                        <div class="stat-bar"><div class="stat-bar-fill" style="width:@StatPct(_weakCopyleftCount)%; background:var(--med)"></div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Strong Copyleft</div>
+                        <div class="stat-value" style="color:var(--crit)">@_strongCopyleftCount</div>
+                        <div class="stat-sub">GPL, AGPL, SSPL…</div>
+                        <div class="stat-bar"><div class="stat-bar-fill" style="width:@StatPct(_strongCopyleftCount)%; background:var(--crit)"></div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Unknown</div>
+                        <div class="stat-value" style="color:var(--text-dimmer)">@_unknownLicenseCount</div>
+                        <div class="stat-sub">unclear or custom license</div>
+                        <div class="stat-bar"><div class="stat-bar-fill" style="width:@StatPct(_unknownLicenseCount)%; background:var(--text-dimmer)"></div></div>
+                    </div>
+                </div>
+
+                <div class="compliance-disclaimer">
+                    ⓘ License risk categories are derived from a curated license-identifier lookup (works with both CycloneDX
+                    and SPDX SBOMs) and are provided for informational purposes only. This is not legal advice — consult qualified legal counsel for compliance decisions.
+                </div>
+
+                @if (list.Count == 0)
+                {
+                    <div class="empty-state">
+                        <div class="empty-state-icon" style="color:var(--low)">✓</div>
+                        <div class="empty-state-title" style="color:var(--low)">No risky or unclear licenses found</div>
+                        <div>All scanned components use permissive or weak-copyleft licenses.</div>
+                    </div>
+                }
+                else
+                {
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Version</th>
+                                <th>License</th>
+                                <th>Risk</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var r in list)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="td-name">@r.Name</div>
+                                        @if (!string.IsNullOrEmpty(r.Purl))
+                                        {
+                                            <div class="td-purl" title="@r.Purl">@r.Purl</div>
+                                        }
+                                    </td>
+                                    <td><span class="td-ver">@r.Version</span></td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(r.License))
+                                        { <span class="license-badge">@r.License</span> }
+                                        else
+                                        { <span style="color:var(--text-dimmer); font-size:11px;">—</span> }
+                                    </td>
+                                    <td>@RiskBadge(r.Risk)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
             </div>
         </div>;
     }
@@ -763,6 +958,21 @@
         };
         return @<span class="sev-badge @cls">@(sev ?? "NONE")</span>;
     }
+
+    private static RenderFragment RiskBadge(LicenseRisk risk)
+    {
+        var (cls, label) = risk switch
+        {
+            LicenseRisk.Permissive     => ("risk-permissive", "PERMISSIVE"),
+            LicenseRisk.WeakCopyleft   => ("risk-weak", "WEAK COPYLEFT"),
+            LicenseRisk.StrongCopyleft => ("risk-strong", "STRONG COPYLEFT"),
+            LicenseRisk.Proprietary    => ("risk-strong", "PROPRIETARY"),
+            _                          => ("risk-unknown", "UNKNOWN"),
+        };
+        return @<span class="license-risk-badge @cls">@label</span>;
+    }
+
+    private double StatPct(int count) => _componentCount > 0 ? Math.Round((double)count / _componentCount * 100, 1) : 0;
 
     private static string ScoreColor(double s) =>
         s >= 9 ? "var(--crit)" : s >= 7 ? "var(--high)" : s >= 4 ? "var(--med)" : "var(--low)";

@@ -116,6 +116,7 @@
       document.body.removeChild(a);
       setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     };
+    window.sbomPrintReport = function () { window.print(); };
   </script>
 
   <script src="_framework/blazor.webassembly.js"></script>
