@@ -67,6 +67,49 @@ public class SbomFormatDetectorTests
     }
 
     [Fact]
+    public void CycloneDX15_DetectsCycloneDX15()
+    {
+        var result = SbomFormatDetector.Detect(TestJson.ValidCycloneDX15Minimal);
+
+        result.Should().Be(SbomFormat.CycloneDX_1_5);
+    }
+
+    [Fact]
+    public void Spdx23_DetectsSpdx23()
+    {
+        var result = SbomFormatDetector.Detect(TestJson.ValidSpdx23Minimal);
+
+        result.Should().Be(SbomFormat.SPDX_2_3);
+    }
+
+    [Fact]
+    public void Spdx30_DetectsSpdx30()
+    {
+        var result = SbomFormatDetector.Detect(TestJson.ValidSpdx30Minimal);
+
+        result.Should().Be(SbomFormat.SPDX_3_0);
+    }
+
+    [Fact]
+    public void Spdx30_UnsupportedSpecVersion_ReturnsUnsupportedVersion()
+    {
+        var json = """
+            {
+                "@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld",
+                "@graph": [
+                    { "type": "CreationInfo", "specVersion": "3.1.0" }
+                ]
+            }
+            """;
+
+        var result = SbomFormatDetector.DetectWithDetails(json);
+
+        result.Format.Should().BeNull();
+        result.IsUnsupportedVersion.Should().BeTrue();
+        result.DetectedVersion.Should().Be("SPDX 3.1.0");
+    }
+
+    [Fact]
     public void CycloneDXWithoutSpecVersion_DefaultsToCycloneDX16()
     {
         var json = """
@@ -102,25 +145,6 @@ public class SbomFormatDetectorTests
     // ─── Unsupported version tests ─────────────────────────────
 
     [Fact]
-    public void CycloneDX15_ReturnsUnsupportedVersion()
-    {
-        var json = """
-            {
-                "bomFormat": "CycloneDX",
-                "specVersion": "1.5",
-                "version": 1,
-                "metadata": { "timestamp": "2024-01-01T00:00:00Z" }
-            }
-            """;
-
-        var result = SbomFormatDetector.DetectWithDetails(json);
-
-        result.Format.Should().BeNull();
-        result.IsUnsupportedVersion.Should().BeTrue();
-        result.DetectedVersion.Should().Be("CycloneDX 1.5");
-    }
-
-    [Fact]
     public void CycloneDX14_ReturnsUnsupportedVersion()
     {
         var json = """
@@ -140,11 +164,11 @@ public class SbomFormatDetectorTests
     }
 
     [Fact]
-    public void Spdx23_ReturnsUnsupportedVersion()
+    public void Spdx24_ReturnsUnsupportedVersion()
     {
         var json = """
             {
-                "spdxVersion": "SPDX-2.3",
+                "spdxVersion": "SPDX-2.4",
                 "dataLicense": "CC0-1.0",
                 "SPDXID": "SPDXRef-DOCUMENT",
                 "name": "test",
@@ -156,7 +180,7 @@ public class SbomFormatDetectorTests
 
         result.Format.Should().BeNull();
         result.IsUnsupportedVersion.Should().BeTrue();
-        result.DetectedVersion.Should().Be("SPDX-2.3");
+        result.DetectedVersion.Should().Be("SPDX-2.4");
     }
 
     [Fact]
@@ -174,10 +198,13 @@ public class SbomFormatDetectorTests
     [Fact]
     public void SupportedVersions_ContainsExpectedFormats()
     {
+        SbomFormatDetector.SupportedVersions.Should().Contain("CycloneDX 1.5");
         SbomFormatDetector.SupportedVersions.Should().Contain("CycloneDX 1.6");
         SbomFormatDetector.SupportedVersions.Should().Contain("CycloneDX 1.7");
         SbomFormatDetector.SupportedVersions.Should().Contain("SPDX 2.2");
-        SbomFormatDetector.SupportedVersions.Should().HaveCount(3);
+        SbomFormatDetector.SupportedVersions.Should().Contain("SPDX 2.3");
+        SbomFormatDetector.SupportedVersions.Should().Contain("SPDX 3.0.1");
+        SbomFormatDetector.SupportedVersions.Should().HaveCount(6);
     }
 
     // ─── Lightweight validation tests ─────────────────────────
@@ -264,5 +291,60 @@ public class SbomFormatDetectorTests
         result.Should().Contain("dataLicense");
         result.Should().Contain("documentNamespace");
         result.Should().Contain("creationInfo");
+    }
+
+    [Fact]
+    public void Validate_ValidCycloneDX15_ReturnsNull()
+    {
+        using var doc = JsonDocument.Parse(TestJson.ValidCycloneDX15WithComponents);
+        var result = SbomFormatDetector.Validate(doc.RootElement, SbomFormat.CycloneDX_1_5);
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public void Validate_ValidSpdx23_ReturnsNull()
+    {
+        using var doc = JsonDocument.Parse(TestJson.ValidSpdx23WithPackages);
+        var result = SbomFormatDetector.Validate(doc.RootElement, SbomFormat.SPDX_2_3);
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public void Validate_ValidSpdx30_ReturnsNull()
+    {
+        using var doc = JsonDocument.Parse(TestJson.ValidSpdx30WithPackages);
+        var result = SbomFormatDetector.Validate(doc.RootElement, SbomFormat.SPDX_3_0);
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public void Validate_Spdx30MissingGraph_ReportsError()
+    {
+        var json = """{ "@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld" }""";
+        using var doc = JsonDocument.Parse(json);
+        var result = SbomFormatDetector.Validate(doc.RootElement, SbomFormat.SPDX_3_0);
+
+        result.Should().NotBeNull();
+        result.Should().Contain("@graph");
+    }
+
+    [Fact]
+    public void Validate_Spdx30MissingCreationInfo_ReportsError()
+    {
+        var json = """
+            {
+                "@graph": [
+                    { "type": "SpdxDocument", "spdxId": "https://example.org/doc1" }
+                ]
+            }
+            """;
+        using var doc = JsonDocument.Parse(json);
+        var result = SbomFormatDetector.Validate(doc.RootElement, SbomFormat.SPDX_3_0);
+
+        result.Should().NotBeNull();
+        result.Should().Contain("CreationInfo");
     }
 }

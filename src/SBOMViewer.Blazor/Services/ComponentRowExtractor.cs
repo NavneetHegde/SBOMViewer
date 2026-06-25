@@ -9,8 +9,9 @@ public static class ComponentRowExtractor
     {
         return format switch
         {
-            SbomFormat.CycloneDX_1_6 or SbomFormat.CycloneDX_1_7 => ExtractCycloneDx(root),
-            SbomFormat.SPDX_2_2 => ExtractSpdx(root),
+            SbomFormat.CycloneDX_1_5 or SbomFormat.CycloneDX_1_6 or SbomFormat.CycloneDX_1_7 => ExtractCycloneDx(root),
+            SbomFormat.SPDX_2_2 or SbomFormat.SPDX_2_3 => ExtractSpdx(root),
+            SbomFormat.SPDX_3_0 => ExtractSpdx3(root),
             _ => []
         };
     }
@@ -73,6 +74,34 @@ public static class ComponentRowExtractor
                     { purl = loc.GetString(); break; }
                 }
             }
+            if (!string.IsNullOrEmpty(name))
+                rows.Add(new ComponentRow(name, version, "package", license, purl, LicenseClassifier.Classify(license)));
+        }
+
+        return rows;
+    }
+
+    private static List<ComponentRow> ExtractSpdx3(JsonElement root)
+    {
+        var rows = new List<ComponentRow>();
+
+        if (!root.TryGetProperty("@graph", out var graph) || graph.ValueKind != JsonValueKind.Array)
+            return rows;
+
+        foreach (var element in graph.EnumerateArray())
+        {
+            if (!element.TryGetProperty("type", out var type) || type.GetString() != "software_Package")
+                continue;
+
+            var name    = element.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
+            var version = element.TryGetProperty("software_packageVersion", out var v) ? v.GetString() ?? "" : "";
+            var purl    = element.TryGetProperty("software_packageUrl", out var p) ? p.GetString() : null;
+
+            var license = element.TryGetProperty("software_concludedLicenseExpression", out var lic) ? lic.GetString() ?? ""
+                : element.TryGetProperty("software_declaredLicenseExpression", out var declLic) ? declLic.GetString() ?? ""
+                : "";
+            if (license is "NOASSERTION" or "NONE") license = "";
+
             if (!string.IsNullOrEmpty(name))
                 rows.Add(new ComponentRow(name, version, "package", license, purl, LicenseClassifier.Classify(license)));
         }

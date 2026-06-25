@@ -1,0 +1,153 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "inventory-management-api",
+  "documentNamespace": "https://example.org/sbom/inventory-management-api-3.3.0",
+  "creationInfo": {
+    "created": "2026-02-01T16:30:00Z",
+    "creators": [
+      "Tool: Microsoft.SBOMTool-3.0.0",
+      "Organization: Contoso Ltd"
+    ],
+    "licenseListVersion": "3.24"
+  },
+  "externalDocumentRefs": [
+    {
+      "externalDocumentId": "DocumentRef-shared-libs",
+      "spdxDocument": "https://example.org/sbom/shared-libs-1.0.0",
+      "checksum": {
+        "algorithm": "SHA256",
+        "checksumValue": "d4c3b2a1e5f6d4c3b2a1e5f6d4c3b2a1e5f6d4c3b2a1e5f6d4c3b2a1e5f6d4c3"
+      }
+    }
+  ],
+  "annotations": [
+    {
+      "annotator": "Person: Jane Reviewer (jane.reviewer@contoso.example)",
+      "annotationType": "REVIEW",
+      "annotationDate": "2026-02-02T09:00:00Z",
+      "comment": "Reviewed for license compliance prior to release.",
+      "annotationSPDXIdentifier": "SPDXRef-DOCUMENT"
+    }
+  ],
+  "packages": [
+    {
+      "name": "inventory-management-api",
+      "SPDXID": "SPDXRef-RootPackage",
+      "versionInfo": "3.3.0",
+      "supplier": "Organization: Contoso Ltd",
+      "downloadLocation": "https://github.com/contoso/inventory-api",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "Copyright (c) 2026 Contoso Ltd",
+      "primaryPackagePurpose": "APPLICATION"
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore",
+      "SPDXID": "SPDXRef-Package-EFCore",
+      "versionInfo": "9.0.0",
+      "supplier": "Organization: Microsoft",
+      "downloadLocation": "https://www.nuget.org/packages/Microsoft.EntityFrameworkCore/9.0.0",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "Copyright (c) .NET Foundation and Contributors",
+      "primaryPackagePurpose": "LIBRARY",
+      "builtDate": "2024-11-01T00:00:00Z",
+      "releaseDate": "2024-11-12T00:00:00Z",
+      "validUntilDate": "2027-11-12T00:00:00Z",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Microsoft.EntityFrameworkCore@9.0.0"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:microsoft:entityframeworkcore:9.0.0:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "advisory",
+          "referenceLocator": "https://github.com/advisories/GHSA-example-0001"
+        }
+      ]
+    },
+    {
+      "name": "AutoMapper",
+      "SPDXID": "SPDXRef-Package-AutoMapper",
+      "versionInfo": "13.0.1",
+      "supplier": "Organization: AutoMapper Contributors",
+      "downloadLocation": "https://www.nuget.org/packages/AutoMapper/13.0.1",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "Copyright (c) Jimmy Bogard",
+      "primaryPackagePurpose": "LIBRARY",
+      "builtDate": "2024-01-15T00:00:00Z",
+      "releaseDate": "2024-01-20T00:00:00Z",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/AutoMapper@13.0.1"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "fix",
+          "referenceLocator": "pkg:nuget/AutoMapper@13.0.1?fixed=13.0.1"
+        }
+      ]
+    },
+    {
+      "name": "Serilog",
+      "SPDXID": "SPDXRef-Package-Serilog",
+      "versionInfo": "4.0.0",
+      "supplier": "Organization: Serilog Contributors",
+      "downloadLocation": "https://www.nuget.org/packages/Serilog/4.0.0",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "Copyright (c) Serilog Contributors",
+      "primaryPackagePurpose": "LIBRARY",
+      "validUntilDate": "2028-01-01T00:00:00Z",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:nuget/Serilog@4.0.0"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "url",
+          "referenceLocator": "https://github.com/serilog/serilog/security/advisories"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-RootPackage"
+    },
+    {
+      "spdxElementId": "SPDXRef-RootPackage",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-EFCore"
+    },
+    {
+      "spdxElementId": "SPDXRef-RootPackage",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-AutoMapper"
+    },
+    {
+      "spdxElementId": "SPDXRef-RootPackage",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-Serilog"
+    }
+  ]
+}

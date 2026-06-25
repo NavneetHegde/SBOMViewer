@@ -13,8 +13,9 @@ public static partial class PackageExtractor
     {
         return format switch
         {
-            SbomFormat.CycloneDX_1_6 or SbomFormat.CycloneDX_1_7 => ExtractCycloneDx(root),
-            SbomFormat.SPDX_2_2 => ExtractSpdx(root),
+            SbomFormat.CycloneDX_1_5 or SbomFormat.CycloneDX_1_6 or SbomFormat.CycloneDX_1_7 => ExtractCycloneDx(root),
+            SbomFormat.SPDX_2_2 or SbomFormat.SPDX_2_3 => ExtractSpdx(root),
+            SbomFormat.SPDX_3_0 => ExtractSpdx3(root),
             _ => []
         };
     }
@@ -60,6 +61,32 @@ public static partial class PackageExtractor
                 continue;
 
             var purl = ExtractPurlFromExternalRefs(pkg);
+            var ecosystem = ParseEcosystemFromPurl(purl);
+            packages.Add(new PackageInfo(name, version, ecosystem, purl));
+        }
+
+        return packages;
+    }
+
+    private static List<PackageInfo> ExtractSpdx3(JsonElement root)
+    {
+        var packages = new List<PackageInfo>();
+
+        if (!root.TryGetProperty("@graph", out var graph) || graph.ValueKind != JsonValueKind.Array)
+            return packages;
+
+        foreach (var element in graph.EnumerateArray())
+        {
+            if (!element.TryGetProperty("type", out var type) || type.GetString() != "software_Package")
+                continue;
+
+            var name = element.TryGetProperty("name", out var n) ? n.GetString() : null;
+            var version = element.TryGetProperty("software_packageVersion", out var v) ? v.GetString() : null;
+
+            if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(version))
+                continue;
+
+            var purl = element.TryGetProperty("software_packageUrl", out var p) ? p.GetString() : null;
             var ecosystem = ParseEcosystemFromPurl(purl);
             packages.Add(new PackageInfo(name, version, ecosystem, purl));
         }

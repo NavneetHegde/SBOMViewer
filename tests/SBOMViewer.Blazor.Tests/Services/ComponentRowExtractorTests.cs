@@ -211,4 +211,88 @@ public class ComponentRowExtractorTests
 
         result.Should().BeEmpty();
     }
+
+    // ─── CycloneDX 1.5 ──────────────────────────────────────
+
+    [Fact]
+    public void Extract_CycloneDX15_LicenseId_UsesIdAndClassifies()
+    {
+        using var doc = JsonDocument.Parse(TestData.TestJson.ValidCycloneDX15WithComponents);
+
+        var result = ComponentRowExtractor.Extract(doc.RootElement, SbomFormat.CycloneDX_1_5);
+
+        result.Should().HaveCount(1);
+        result[0].Name.Should().Be("ComponentA");
+        result[0].License.Should().Be("MIT");
+        result[0].Risk.Should().Be(LicenseRisk.Permissive);
+    }
+
+    // ─── SPDX 2.3 ──────────────────────────────────────────
+
+    [Fact]
+    public void Extract_Spdx23_LicenseConcluded_UsedAndClassified()
+    {
+        using var doc = JsonDocument.Parse(TestData.TestJson.ValidSpdx23WithPackages);
+
+        var result = ComponentRowExtractor.Extract(doc.RootElement, SbomFormat.SPDX_2_3);
+
+        result.Should().HaveCount(1);
+        result[0].License.Should().Be("MIT");
+        result[0].Risk.Should().Be(LicenseRisk.Permissive);
+        result[0].Purl.Should().Be("pkg:npm/PackageA@1.0.0");
+    }
+
+    [Fact]
+    public void Extract_Spdx23_NewSupplyChainAndSecurityFields_DontBreakExtraction()
+    {
+        using var doc = JsonDocument.Parse(TestData.TestJson.ValidSpdx23WithSecurityAndSupplyChainFields);
+
+        var result = ComponentRowExtractor.Extract(doc.RootElement, SbomFormat.SPDX_2_3);
+
+        result.Should().HaveCount(1);
+        result[0].Name.Should().Be("PackageA");
+        result[0].License.Should().Be("MIT");
+        result[0].Risk.Should().Be(LicenseRisk.Permissive);
+        result[0].Purl.Should().Be("pkg:npm/PackageA@1.0.0");
+    }
+
+    // ─── SPDX 3.0.1 ──────────────────────────────────────────
+
+    [Fact]
+    public void Extract_Spdx30_ConcludedLicenseExpression_UsedAndClassified()
+    {
+        using var doc = JsonDocument.Parse(TestData.TestJson.ValidSpdx30WithPackages);
+
+        var result = ComponentRowExtractor.Extract(doc.RootElement, SbomFormat.SPDX_3_0);
+
+        result.Should().HaveCount(1);
+        result[0].Name.Should().Be("PackageA");
+        result[0].License.Should().Be("MIT");
+        result[0].Risk.Should().Be(LicenseRisk.Permissive);
+        result[0].Purl.Should().Be("pkg:npm/PackageA@1.0.0");
+    }
+
+    [Fact]
+    public void Extract_Spdx30_SecurityAndBuildProfileElements_DontBreakExtraction()
+    {
+        using var doc = JsonDocument.Parse(TestData.TestJson.ValidSpdx30WithSecurityAndBuildProfile);
+
+        var result = ComponentRowExtractor.Extract(doc.RootElement, SbomFormat.SPDX_3_0);
+
+        result.Should().HaveCount(1);
+        result[0].Name.Should().Be("PackageA");
+        result[0].License.Should().Be("MIT");
+        result[0].Risk.Should().Be(LicenseRisk.Permissive);
+        result[0].Purl.Should().Be("pkg:npm/PackageA@1.0.0");
+    }
+
+    [Fact]
+    public void Extract_Spdx30_IgnoresNonPackageElements()
+    {
+        using var doc = JsonDocument.Parse(TestData.TestJson.ValidSpdx30Minimal);
+
+        var result = ComponentRowExtractor.Extract(doc.RootElement, SbomFormat.SPDX_3_0);
+
+        result.Should().BeEmpty();
+    }
 }

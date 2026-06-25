@@ -7,10 +7,11 @@ public record DetectionResult(SbomFormat? Format, string? DetectedVersion, bool 
 
 public static class SbomFormatDetector
 {
-    public static readonly string[] SupportedVersions = ["CycloneDX 1.6", "CycloneDX 1.7", "SPDX 2.2"];
+    public static readonly string[] SupportedVersions =
+        ["CycloneDX 1.5", "CycloneDX 1.6", "CycloneDX 1.7", "SPDX 2.2", "SPDX 2.3", "SPDX 3.0.1"];
 
-    private static readonly HashSet<string> SupportedCycloneDXVersions = ["1.6", "1.7"];
-    private static readonly HashSet<string> SupportedSpdxVersions = ["SPDX-2.2"];
+    private static readonly HashSet<string> SupportedCycloneDXVersions = ["1.5", "1.6", "1.7"];
+    private static readonly HashSet<string> SupportedSpdxVersions = ["SPDX-2.2", "SPDX-2.3"];
 
     public static SbomFormat? Detect(string jsonContent) => DetectWithDetails(jsonContent).Format;
 
@@ -22,8 +23,9 @@ public static class SbomFormatDetector
     {
         return format switch
         {
-            SbomFormat.CycloneDX_1_6 or SbomFormat.CycloneDX_1_7 => ValidateCycloneDX(root),
-            SbomFormat.SPDX_2_2 => ValidateSpdx(root),
+            SbomFormat.CycloneDX_1_5 or SbomFormat.CycloneDX_1_6 or SbomFormat.CycloneDX_1_7 => ValidateCycloneDX(root),
+            SbomFormat.SPDX_2_2 or SbomFormat.SPDX_2_3 => ValidateSpdx(root),
+            SbomFormat.SPDX_3_0 => ValidateSpdx3(root),
             _ => null
         };
     }
@@ -68,6 +70,26 @@ public static class SbomFormatDetector
             : null;
     }
 
+    private static string? ValidateSpdx3(JsonElement root)
+    {
+        var missing = new List<string>();
+
+        if (!root.TryGetProperty("@graph", out var graph) || graph.ValueKind != JsonValueKind.Array)
+            missing.Add("@graph");
+        else
+        {
+            var elements = graph.EnumerateArray().ToList();
+            if (!elements.Any(e => e.TryGetProperty("type", out var t) && t.GetString() == "SpdxDocument"))
+                missing.Add("SpdxDocument element");
+            if (!elements.Any(e => e.TryGetProperty("type", out var t) && t.GetString() == "CreationInfo"))
+                missing.Add("CreationInfo element");
+        }
+
+        return missing.Count > 0
+            ? $"Invalid SPDX 3.0: missing required fields: {string.Join(", ", missing)}"
+            : null;
+    }
+
     public static DetectionResult DetectWithDetails(string jsonContent)
     {
         if (string.IsNullOrWhiteSpace(jsonContent))
@@ -93,9 +115,12 @@ public static class SbomFormatDetector
                 if (version != null && !SupportedCycloneDXVersions.Contains(version))
                     return new DetectionResult(null, $"CycloneDX {version}", true);
 
-                return version == "1.7"
-                    ? new DetectionResult(SbomFormat.CycloneDX_1_7, "CycloneDX 1.7", false)
-                    : new DetectionResult(SbomFormat.CycloneDX_1_6, "CycloneDX 1.6", false);
+                return version switch
+                {
+                    "1.7" => new DetectionResult(SbomFormat.CycloneDX_1_7, "CycloneDX 1.7", false),
+                    "1.5" => new DetectionResult(SbomFormat.CycloneDX_1_5, "CycloneDX 1.5", false),
+                    _ => new DetectionResult(SbomFormat.CycloneDX_1_6, "CycloneDX 1.6", false)
+                };
             }
 
             if (root.TryGetProperty("spdxVersion", out var spdxVersion))
@@ -105,7 +130,35 @@ public static class SbomFormatDetector
                 if (version != null && !SupportedSpdxVersions.Contains(version))
                     return new DetectionResult(null, version, true);
 
-                return new DetectionResult(SbomFormat.SPDX_2_2, "SPDX 2.2", false);
+                return version == "SPDX-2.3"
+                    ? new DetectionResult(SbomFormat.SPDX_2_3, "SPDX 2.3", false)
+                    : new DetectionResult(SbomFormat.SPDX_2_2, "SPDX 2.2", false);
+            }
+
+            // SPDX 3.0 uses JSON-LD: no top-level spdxVersion, elements live in @graph
+            if (root.TryGetProperty("@graph", out var graph) && graph.ValueKind == JsonValueKind.Array)
+            {
+                var elements = graph.EnumerateArray().ToList();
+
+                var creationInfo = elements
+                    .FirstOrDefault(e => e.TryGetProperty("type", out var t) && t.GetString() == "CreationInfo");
+                var hasSpdxDocument = elements
+                    .Any(e => e.TryGetProperty("type", out var t) && t.GetString() == "SpdxDocument");
+
+                // Only claim SPDX 3.0 when the graph actually carries SPDX marker elements;
+                // otherwise an unrelated JSON-LD document would be misreported as invalid SPDX.
+                if (creationInfo.ValueKind == JsonValueKind.Object || hasSpdxDocument)
+                {
+                    var version = creationInfo.ValueKind == JsonValueKind.Object &&
+                                  creationInfo.TryGetProperty("specVersion", out var sv)
+                        ? sv.GetString()
+                        : null;
+
+                    if (version != null && version != "3.0.1" && version != "3.0")
+                        return new DetectionResult(null, $"SPDX {version}", true);
+
+                    return new DetectionResult(SbomFormat.SPDX_3_0, "SPDX 3.0.1", false);
+                }
             }
 
             return new DetectionResult(null, null, false);
