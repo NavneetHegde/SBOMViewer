@@ -1003,16 +1003,19 @@
 
     private static string GetFormatName(SbomFormat f) => f switch
     {
-        SbomFormat.CycloneDX_1_6 or SbomFormat.CycloneDX_1_7 => "CycloneDX",
-        SbomFormat.SPDX_2_2 => "SPDX",
+        SbomFormat.CycloneDX_1_5 or SbomFormat.CycloneDX_1_6 or SbomFormat.CycloneDX_1_7 => "CycloneDX",
+        SbomFormat.SPDX_2_2 or SbomFormat.SPDX_2_3 or SbomFormat.SPDX_3_0 => "SPDX",
         _ => f.ToString()
     };
 
     private static string GetFormatVersion(SbomFormat f) => f switch
     {
+        SbomFormat.CycloneDX_1_5 => "1.5",
         SbomFormat.CycloneDX_1_6 => "1.6",
         SbomFormat.CycloneDX_1_7 => "1.7",
         SbomFormat.SPDX_2_2      => "2.2",
+        SbomFormat.SPDX_2_3      => "2.3",
+        SbomFormat.SPDX_3_0      => "3.0.1",
         _ => ""
     };
 }
