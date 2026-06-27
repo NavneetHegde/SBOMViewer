@@ -276,4 +276,86 @@ public class PackageExtractorTests
 
         result.Should().BeEmpty();
     }
+
+    // ─── CycloneDX 1.5 ──────────────────────────────────────
+
+    [Fact]
+    public void ExtractPackages_CycloneDX15_ExtractsComponents()
+    {
+        using var doc = JsonDocument.Parse(TestData.TestJson.ValidCycloneDX15WithComponents);
+
+        var result = PackageExtractor.ExtractPackages(doc.RootElement, SbomFormat.CycloneDX_1_5);
+
+        result.Should().HaveCount(1);
+        result[0].Name.Should().Be("ComponentA");
+        result[0].Version.Should().Be("1.0.0");
+    }
+
+    // ─── SPDX 2.3 ──────────────────────────────────────────
+
+    [Fact]
+    public void ExtractPackages_Spdx23_ExtractsPackages()
+    {
+        using var doc = JsonDocument.Parse(TestData.TestJson.ValidSpdx23WithPackages);
+
+        var result = PackageExtractor.ExtractPackages(doc.RootElement, SbomFormat.SPDX_2_3);
+
+        result.Should().HaveCount(1);
+        result[0].Name.Should().Be("PackageA");
+        result[0].Version.Should().Be("1.0.0");
+        result[0].Ecosystem.Should().Be("npm");
+    }
+
+    [Fact]
+    public void ExtractPackages_Spdx23_IgnoresSecurityRefs_StillFindsPurl()
+    {
+        using var doc = JsonDocument.Parse(TestData.TestJson.ValidSpdx23WithSecurityAndSupplyChainFields);
+
+        var result = PackageExtractor.ExtractPackages(doc.RootElement, SbomFormat.SPDX_2_3);
+
+        result.Should().HaveCount(1);
+        result[0].Name.Should().Be("PackageA");
+        result[0].Version.Should().Be("1.0.0");
+        result[0].Purl.Should().Be("pkg:npm/PackageA@1.0.0");
+        result[0].Ecosystem.Should().Be("npm");
+    }
+
+    // ─── SPDX 3.0.1 ──────────────────────────────────────────
+
+    [Fact]
+    public void ExtractPackages_Spdx30_ExtractsSoftwarePackages()
+    {
+        using var doc = JsonDocument.Parse(TestData.TestJson.ValidSpdx30WithPackages);
+
+        var result = PackageExtractor.ExtractPackages(doc.RootElement, SbomFormat.SPDX_3_0);
+
+        result.Should().HaveCount(1);
+        result[0].Name.Should().Be("PackageA");
+        result[0].Version.Should().Be("1.0.0");
+        result[0].Ecosystem.Should().Be("npm");
+        result[0].Purl.Should().Be("pkg:npm/PackageA@1.0.0");
+    }
+
+    [Fact]
+    public void ExtractPackages_Spdx30_IgnoresSecurityAndBuildProfileElements_StillFindsPackage()
+    {
+        using var doc = JsonDocument.Parse(TestData.TestJson.ValidSpdx30WithSecurityAndBuildProfile);
+
+        var result = PackageExtractor.ExtractPackages(doc.RootElement, SbomFormat.SPDX_3_0);
+
+        result.Should().HaveCount(1);
+        result[0].Name.Should().Be("PackageA");
+        result[0].Version.Should().Be("1.0.0");
+        result[0].Purl.Should().Be("pkg:npm/PackageA@1.0.0");
+    }
+
+    [Fact]
+    public void ExtractPackages_Spdx30_IgnoresNonPackageElements()
+    {
+        using var doc = JsonDocument.Parse(TestData.TestJson.ValidSpdx30Minimal);
+
+        var result = PackageExtractor.ExtractPackages(doc.RootElement, SbomFormat.SPDX_3_0);
+
+        result.Should().BeEmpty();
+    }
 }

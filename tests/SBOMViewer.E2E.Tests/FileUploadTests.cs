@@ -65,10 +65,31 @@ public class FileUploadTests : TestBase
     [Test]
     public async Task Upload_UnsupportedVersion_ShowsError()
     {
-        await UploadFile(Path.Combine(SamplesDir, "cyclonedx-1.5-unsupported.json"));
+        await UploadFile(Path.Combine(SamplesDir, "cyclonedx-1.4-unsupported.json"));
         // UploadFile.razor: <div class="upload-error">⚠ Version "..." is not supported.</div>
         await Expect(Page.Locator(".upload-error", new() { HasText = "not supported" }))
             .ToBeVisibleAsync(new() { Timeout = 10_000 });
+    }
+
+    [Test]
+    public async Task Upload_CycloneDX15_RendersDashboard()
+    {
+        await UploadFile(Path.Combine(SamplesDir, "cyclonedx-1.5-full.json"));
+        await Expect(Page.Locator(".dashboard")).ToBeVisibleAsync(new() { Timeout = 15_000 });
+    }
+
+    [Test]
+    public async Task Upload_SPDX23_RendersDashboard()
+    {
+        await UploadFile(Path.Combine(SamplesDir, "spdx-2.3-full.json"));
+        await Expect(Page.Locator(".dashboard")).ToBeVisibleAsync(new() { Timeout = 15_000 });
+    }
+
+    [Test]
+    public async Task Upload_SPDX30_RendersDashboard()
+    {
+        await UploadFile(Path.Combine(SamplesDir, "spdx-3.0.1-full.json"));
+        await Expect(Page.Locator(".dashboard")).ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
     [Test]

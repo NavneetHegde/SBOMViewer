@@ -27,12 +27,19 @@ The app includes built-in **vulnerability scanning** powered by [OSV.dev](https:
 
 | Format | Versions |
 |--------|----------|
-| CycloneDX | 1.6, 1.7 |
-| SPDX | 2.2 |
+| CycloneDX | 1.5, 1.6, 1.7 |
+| SPDX | 2.2, 2.3, 3.0.1 |
 
 The format and version are **auto-detected** from the uploaded JSON file—no manual selection required. Unsupported versions are rejected with a clear error message.
 
 ## Latest Release
+
+**Unreleased** – CycloneDX 1.5 and SPDX 2.3 / 3.0.1 support
+
+- **CycloneDX 1.5** support (backward compatibility — same component/license shape as 1.6/1.7)
+- **SPDX 2.3** support (same package shape as 2.2)
+- **SPDX 3.0.1** support — the new JSON-LD `@graph` document model, with dedicated detection, validation, and extraction logic
+- Updated sample files and format badges to reflect all six supported format/version combinations
 
 **Version 3.0.0** – Dynamic UI engine, CycloneDX 1.7 & auto-detect
 
@@ -76,12 +83,15 @@ The [`samples/`](./samples/) folder contains ready-to-use SBOM files for testing
 
 | File | Format | Purpose |
 |------|--------|---------|
+| `cyclonedx-1.5-full.json` | CycloneDX 1.5 | Full — components, licenses, dependencies |
 | `cyclonedx-1.6-minimal.json` | CycloneDX 1.6 | Minimal — 3 components |
 | `cyclonedx-1.6-full.json` | CycloneDX 1.6 | Full — 8 components, hashes, authors, external refs |
 | `cyclonedx-1.7-full.json` | CycloneDX 1.7 | Full — lifecycles, tags, OmniBOR, SWHID, standards, declarations, formulation |
-| `cyclonedx-1.5-unsupported.json` | CycloneDX 1.5 | Negative test — triggers unsupported version error |
+| `cyclonedx-1.4-unsupported.json` | CycloneDX 1.4 | Negative test — triggers unsupported version error |
 | `spdx-2.2-minimal.json` | SPDX 2.2 | Minimal — 3 packages |
 | `spdx-2.2-full.json` | SPDX 2.2 | Full — 7 packages, checksums, external refs |
+| `spdx-2.3-full.json` | SPDX 2.3 | Full — packages, checksums, external refs |
+| `spdx-3.0.1-full.json` | SPDX 3.0.1 | JSON-LD `@graph` document — software packages, relationships |
 
 ## Technology Stack
 

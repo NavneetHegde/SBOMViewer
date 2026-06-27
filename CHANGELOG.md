@@ -1,6 +1,17 @@
 ﻿# Changelog
 
-## [3.0.0] – Current
+## [Unreleased]
+
+### New Features
+- **CycloneDX 1.5 support** — backward compatibility; same component/license shape as 1.6/1.7, so no new extraction logic was needed.
+- **SPDX 2.3 support** — same package shape as 2.2.
+- **SPDX 3.0.1 support** — the new JSON-LD `@graph` document model (no top-level `spdxVersion`/`packages`/`SPDXID`). Added dedicated detection (locates the `CreationInfo` element's `specVersion`), validation (`ValidateSpdx3`), and extraction (`ExtractSpdx3` in both `PackageExtractor` and `ComponentRowExtractor`, filtering `software_Package` elements).
+
+### Improvements
+- `SbomFormatDetector.SupportedVersions` now lists six format/version combinations: CycloneDX 1.5/1.6/1.7, SPDX 2.2/2.3/3.0.1.
+- Added sample files `spdx-2.3-full.json` and `spdx-3.0.1-full.json`; renamed `cyclonedx-1.5-unsupported.json` → `cyclonedx-1.5-full.json` (1.5 is now supported) and added `cyclonedx-1.4-unsupported.json` as the new unsupported-version negative test fixture.
+
+## [3.0.0]
 
 ### New Features
 - **Dynamic rendering pipeline** — replaced all format-specific viewers (`CycloneDXViewer`, `SpdxViewer`), parsers (`CycloneDXParser`, `SpdxParser`), and typed models (`CycloneDXDocument`, `SpdxDocument`) with a JSON-driven UI. Three recursive components (`DynamicSbomViewer`, `DynamicSection`, `DynamicObject`) walk `JsonElement` + `SchemaNode` to render any SBOM format automatically.

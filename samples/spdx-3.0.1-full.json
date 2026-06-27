@@ -1,0 +1,98 @@
+{
+  "@context": "https://spdx.org/rdf/3.0.1/spdx-context.jsonld",
+  "@graph": [
+    {
+      "type": "SpdxDocument",
+      "spdxId": "https://example.org/sbom/inventory-management-api-4.0.0#SPDXRef-DOCUMENT",
+      "name": "inventory-management-api",
+      "rootElement": [
+        "https://example.org/sbom/inventory-management-api-4.0.0#SPDXRef-RootPackage"
+      ]
+    },
+    {
+      "type": "CreationInfo",
+      "spdxId": "_:creationinfo",
+      "specVersion": "3.0.1",
+      "created": "2026-04-01T16:30:00Z",
+      "createdBy": [
+        "https://example.org/sbom/inventory-management-api-4.0.0#SPDXRef-Agent-ContosoLtd"
+      ],
+      "profileConformance": ["core", "software", "security", "build"]
+    },
+    {
+      "type": "Agent",
+      "spdxId": "https://example.org/sbom/inventory-management-api-4.0.0#SPDXRef-Agent-ContosoLtd",
+      "name": "Contoso Ltd",
+      "externalIdentifier": [
+        { "externalIdentifierType": "email", "identifier": "sbom@contoso.example" }
+      ]
+    },
+    {
+      "type": "software_Package",
+      "spdxId": "https://example.org/sbom/inventory-management-api-4.0.0#SPDXRef-RootPackage",
+      "name": "inventory-management-api",
+      "software_packageVersion": "4.0.0",
+      "software_concludedLicenseExpression": "MIT"
+    },
+    {
+      "type": "software_Package",
+      "spdxId": "https://example.org/sbom/inventory-management-api-4.0.0#SPDXRef-Package-EFCore",
+      "name": "Microsoft.EntityFrameworkCore",
+      "software_packageVersion": "9.0.0",
+      "software_packageUrl": "pkg:nuget/Microsoft.EntityFrameworkCore@9.0.0",
+      "software_concludedLicenseExpression": "MIT"
+    },
+    {
+      "type": "software_Package",
+      "spdxId": "https://example.org/sbom/inventory-management-api-4.0.0#SPDXRef-Package-Serilog",
+      "name": "Serilog",
+      "software_packageVersion": "4.0.0",
+      "software_packageUrl": "pkg:nuget/Serilog@4.0.0",
+      "software_concludedLicenseExpression": "Apache-2.0"
+    },
+    {
+      "type": "Relationship",
+      "spdxId": "_:relationship-1",
+      "from": "https://example.org/sbom/inventory-management-api-4.0.0#SPDXRef-RootPackage",
+      "relationshipType": "dependsOn",
+      "to": [
+        "https://example.org/sbom/inventory-management-api-4.0.0#SPDXRef-Package-EFCore",
+        "https://example.org/sbom/inventory-management-api-4.0.0#SPDXRef-Package-Serilog"
+      ]
+    },
+    {
+      "type": "security_Vulnerability",
+      "spdxId": "https://example.org/sbom/inventory-management-api-4.0.0#SPDXRef-Vuln-CVE-2024-12345",
+      "name": "CVE-2024-12345",
+      "summary": "Denial of service via crafted EF Core query expression",
+      "published": "2024-12-01T00:00:00Z",
+      "modified": "2024-12-05T00:00:00Z"
+    },
+    {
+      "type": "Relationship",
+      "spdxId": "_:relationship-2",
+      "from": "https://example.org/sbom/inventory-management-api-4.0.0#SPDXRef-Vuln-CVE-2024-12345",
+      "relationshipType": "hasAssociatedVulnerability",
+      "to": [
+        "https://example.org/sbom/inventory-management-api-4.0.0#SPDXRef-Package-EFCore"
+      ]
+    },
+    {
+      "type": "Build",
+      "spdxId": "https://example.org/sbom/inventory-management-api-4.0.0#SPDXRef-Build-CI",
+      "build_buildType": "https://example.org/build-types/github-actions",
+      "build_configSourceEntrypoint": ["build.yml"],
+      "build_buildStartTime": "2026-03-31T20:00:00Z",
+      "build_buildEndTime": "2026-03-31T20:04:00Z"
+    },
+    {
+      "type": "Relationship",
+      "spdxId": "_:relationship-3",
+      "from": "https://example.org/sbom/inventory-management-api-4.0.0#SPDXRef-Build-CI",
+      "relationshipType": "generates",
+      "to": [
+        "https://example.org/sbom/inventory-management-api-4.0.0#SPDXRef-RootPackage"
+      ]
+    }
+  ]
+}

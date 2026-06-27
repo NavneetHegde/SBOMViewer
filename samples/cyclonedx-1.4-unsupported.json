@@ -1,0 +1,34 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.4",
+  "serialNumber": "urn:uuid:a1234567-89ab-cdef-0123-456789abcdef",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2022-03-01T08:00:00Z",
+    "tools": [
+      {
+        "vendor": "CycloneDX",
+        "name": "cdxgen",
+        "version": "8.0.0"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "bom-ref": "legacy-app",
+      "name": "legacy-app",
+      "version": "1.0.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/react@17.0.2",
+      "name": "react",
+      "version": "17.0.2",
+      "purl": "pkg:npm/react@17.0.2",
+      "licenses": [
+        { "license": { "id": "MIT" } }
+      ]
+    }
+  ]
+}
