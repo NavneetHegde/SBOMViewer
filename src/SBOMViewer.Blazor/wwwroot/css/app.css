@@ -162,6 +162,15 @@ body {
 .font-btn.plus  { font-size: 1.0625rem; }
 .font-divider   { width: 1px; height: 18px; background: var(--border); flex-shrink: 0; }
 
+/* The viewer nav carries Export / Compare / New file. Collapse to icons before they
+   overflow the bar, and drop the font controls on the narrowest screens. */
+@media (max-width: 940px) {
+  .nav-action-label { display: none; }
+}
+@media (max-width: 620px) {
+  .font-controls { display: none; }
+}
+
 /* ── Footer ────────────────────────────────────────────────────────────────── */
 .app-footer {
   display: flex; align-items: center; justify-content: center; gap: 0;
@@ -192,8 +201,14 @@ body {
 /* ── Upload screen ─────────────────────────────────────────────────────────── */
 .upload-screen {
   flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 48px;
-  position: relative; overflow: hidden; background: var(--bg);
+  align-items: center; gap: 48px;
+  position: relative; background: var(--bg);
+  /* Scroll rather than clip when the two option cards exceed the viewport (short or narrow
+     screens). "safe center" keeps the content centred while it fits, but falls back to
+     flex-start instead of clipping the top once it overflows. */
+  overflow-y: auto; overflow-x: hidden;
+  justify-content: safe center;
+  padding: 32px 16px;
 }
 .upload-grid {
   position: absolute; inset: 0;
@@ -210,9 +225,12 @@ body {
 .upload-hero h1 {
   font-size: clamp(1.875rem, 4vw, 3.125rem); font-weight: 700; letter-spacing: -0.04em;
   line-height: 1.1; margin-bottom: 14px; color: var(--text);
+  /* Hug the text so the heading does not stretch to the width of the subtitle below it. */
+  width: fit-content; margin-inline: auto;
 }
 .upload-hero h1 span { color: var(--accent); }
-.upload-hero p { font-size: 1rem; color: var(--text-dim); max-width: 440px; line-height: 1.65; margin: 0 auto; }
+/* Sits on a single line on desktop; wraps naturally once the viewport is too narrow. */
+.upload-hero p { font-size: 1rem; color: var(--text-dim); max-width: 100%; line-height: 1.65; margin: 0 auto; white-space: nowrap; }
 
 .dropzone {
   position: relative; z-index: 1; width: min(500px, 90vw);
@@ -517,6 +535,159 @@ body {
 
 /* ── Printable report ──────────────────────────────────────────────────────── */
 .print-report { display: none; }
+
+/* The two entry points sit side by side so neither reads as secondary. */
+.upload-options {
+  position: relative; z-index: 1; width: min(920px, 92vw);
+  display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: stretch;
+}
+/* Scoped to the landing page so the compare page's slots keep their own metrics. */
+.upload-options > .dropzone { width: 100%; }
+.upload-options > .dropzone,
+.upload-options > .compare-card { padding-block: 26px; gap: 13px; }
+
+.compare-card {
+  border: 1.5px solid var(--border); border-radius: 16px;
+  background: var(--bg2); padding: 40px 32px;
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  text-align: center; text-decoration: none;
+  cursor: pointer; transition: all 0.2s;
+}
+.compare-card:hover, .compare-card:focus-visible {
+  border-color: var(--accent); background: var(--accent-glow);
+  box-shadow: 0 0 48px var(--accent-glow);
+}
+.compare-card .dropzone-icon { color: var(--accent); }
+.compare-card h3 { font-size: 1.1875rem; font-weight: 600; color: var(--text); }
+.compare-card p  { font-size: 0.8125rem; color: var(--text-dim); line-height: 1.55; }
+/* Centred as a block, but the items themselves are left-aligned so the ticks line up. */
+.compare-card-points {
+  list-style: none; padding: 0; margin: 0; text-align: left;
+  display: flex; flex-direction: column; gap: 6px;
+  font-size: 0.75rem; color: var(--text-dim);
+}
+.compare-card-points li::before { content: "✓ "; color: var(--accent); font-weight: 700; }
+.compare-card-btn {
+  margin-top: auto; font-size: 0.8125rem; font-weight: 600;
+  color: var(--accent); transition: transform 0.2s;
+}
+.compare-card:hover .compare-card-btn { transform: translateX(3px); }
+
+@media (max-width: 720px) {
+  .upload-options { grid-template-columns: 1fr; }
+  .upload-screen { gap: 28px; }
+  .upload-options > .dropzone,
+  .upload-options > .compare-card { padding: 22px 24px; }
+  /* Too narrow for one line — allow the subtitle to wrap rather than overflow. */
+  .upload-hero p { white-space: normal; max-width: 440px; }
+}
+
+/* ── Recent SBOMs ──────────────────────────────────────────────────────────── */
+
+.recent-bar {
+  position: relative; z-index: 1; width: min(920px, 92vw);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.recent-bar-head { display: flex; align-items: center; justify-content: space-between; }
+.recent-bar-title {
+  font-size: 0.75rem; color: var(--text-dimmer); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.09em;
+}
+.recent-clear {
+  background: none; border: none; cursor: pointer;
+  font-size: 0.75rem; color: var(--text-dimmer); padding: 2px 4px;
+}
+.recent-clear:hover { color: var(--crit); text-decoration: underline; }
+
+.recent-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.recent-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  padding: 11px 14px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg2);
+  text-align: left; min-width: 0; transition: all 0.2s;
+}
+.recent-item:hover { border-color: var(--accent); background: var(--accent-glow); }
+.recent-item-name {
+  font-family: var(--mono); font-size: 0.8125rem; color: var(--text);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.recent-item-meta { font-size: 0.6875rem; color: var(--text-dimmer); }
+.recent-note { font-size: 0.6875rem; color: var(--text-dimmer); text-align: center; }
+
+/* Recent shortcuts inside an empty comparison slot. */
+.slot-recent { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.slot-recent-label {
+  font-size: 0.6875rem; color: var(--text-dimmer);
+  text-transform: uppercase; letter-spacing: 0.07em; font-weight: 600;
+}
+.slot-recent-item {
+  font-family: var(--mono); font-size: 0.6875rem; padding: 3px 8px;
+  border-radius: 4px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text-dim); cursor: pointer;
+  max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: all 0.2s;
+}
+.slot-recent-item:hover { border-color: var(--accent); color: var(--accent); }
+
+@media (max-width: 720px) {
+  .recent-list { grid-template-columns: 1fr; }
+}
+
+/* ── Compare (SBOM diff) ───────────────────────────────────────────────────── */
+
+.compare-slots {
+  display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px;
+  align-items: start; margin-bottom: 22px;
+}
+.compare-slot { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.compare-slot-label {
+  font-size: 0.75rem; color: var(--text-dimmer); text-transform: uppercase;
+  letter-spacing: 0.07em; font-weight: 600;
+}
+/* Both slot states share a min-height so a filled slot stays aligned with an empty one. */
+.compare-dropzone { width: 100%; padding: 26px 20px; gap: 10px; min-height: 172px; justify-content: center; }
+.compare-dropzone.awaiting {
+  border-color: var(--accent); border-style: solid;
+  background: var(--accent-glow); box-shadow: 0 0 32px var(--accent-glow);
+}
+.compare-slot-filled {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--bg2); padding: 18px 20px; min-height: 172px;
+  display: flex; flex-direction: column; align-items: flex-start;
+  justify-content: center; gap: 6px;
+}
+.compare-slot-file {
+  font-family: var(--mono); font-size: 0.8125rem; font-weight: 500;
+  color: var(--text); word-break: break-all; line-height: 1.4;
+}
+.compare-slot-meta { font-size: 0.75rem; color: var(--text-dimmer); margin-bottom: 4px; }
+.compare-slot-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.compare-arrow { font-size: 1.25rem; color: var(--text-dimmer); align-self: center; }
+.compare-swap {
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg2); color: var(--text-dim);
+  width: 38px; height: 38px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.compare-swap:hover {
+  border-color: var(--accent); color: var(--accent);
+  background: var(--accent-glow); transform: rotate(180deg);
+}
+.compare-hint {
+  text-align: center; padding: 44px 24px; color: var(--text-dim);
+  border: 1px dashed var(--border); border-radius: var(--radius); background: var(--bg2);
+}
+.compare-hint p { font-size: 0.9375rem; }
+.compare-hint-sub {
+  font-size: 0.8125rem !important; color: var(--text-dimmer);
+  margin-top: 8px; max-width: 460px; margin-inline: auto; line-height: 1.6;
+}
+
+@media (max-width: 760px) {
+  .compare-slots { grid-template-columns: 1fr; }
+  .compare-arrow { display: none; }
+}
 
 @media print {
   body * { visibility: hidden; }

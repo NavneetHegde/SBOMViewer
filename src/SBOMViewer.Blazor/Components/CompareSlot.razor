@@ -1,0 +1,128 @@
+@using SBOMViewer.Blazor.Models
+@inject SbomLoader SbomLoader
+@inject RecentSbomStore RecentStore
+
+<div class="compare-slot">
+    <div class="compare-slot-label">@Label</div>
+
+    @if (FileName is not null)
+    {
+        <div class="compare-slot-filled">
+            <div class="compare-slot-file">@FileName</div>
+            <div class="compare-slot-meta">@FormatLabel · @ComponentCount components</div>
+            <div class="compare-slot-actions">
+                <button class="btn-ghost btn-open-viewer"
+                        title="Open this file on its own in the single-file viewer"
+                        @onclick="OnOpen">↗ Open in viewer</button>
+                <button class="btn-ghost" @onclick="OnClear">Replace</button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="dropzone compare-dropzone @(_drag ? "dragover" : "") @(Awaiting ? "awaiting" : "")"
+             style="position:relative;"
+             @ondragenter="() => _dragCounter++"
+             @ondragleave="() => _dragCounter = Math.Max(0, _dragCounter - 1)"
+             @ondragover:preventDefault="true"
+             @ondrop="() => _dragCounter = 0">
+
+            <InputFile style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2; width:100%; height:100%; outline:none;"
+                       accept=".json"
+                       OnChange="OnFileChanged" />
+
+            <div style="position:relative; z-index:1; pointer-events:none; display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center;">
+                <div class="dropzone-icon" style="font-size:1.75rem;">@Icon</div>
+                <h3 style="font-size:0.9375rem;">@Placeholder</h3>
+                <p>drop or click to browse</p>
+            </div>
+        </div>
+
+        @if (Recent.Count > 0)
+        {
+            @* Sits outside the dropzone: the InputFile overlay covers that whole area. *@
+            <div class="slot-recent">
+                <span class="slot-recent-label">Recent:</span>
+                @foreach (var item in Recent)
+                {
+                    <button class="slot-recent-item" title="@($"{item.Name} · {item.Format}")"
+                            @onclick="() => PickRecent(item)">@item.Name</button>
+                }
+            </div>
+        }
+    }
+
+    @if (_error is not null)
+    {
+        <div class="upload-error" style="margin-top:10px;">⚠ @_error</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter] public string Placeholder { get; set; } = "Select SBOM";
+    [Parameter] public string Icon { get; set; } = "📄";
+    [Parameter] public string? FileName { get; set; }
+    /// <summary>Highlights this slot when it is the only one still missing a file.</summary>
+    [Parameter] public bool Awaiting { get; set; }
+    [Parameter] public string FormatLabel { get; set; } = "";
+    [Parameter] public int ComponentCount { get; set; }
+    [Parameter] public EventCallback<SbomLoadResult> OnLoaded { get; set; }
+    [Parameter] public EventCallback OnCleared { get; set; }
+    /// <summary>Raised when the user wants this slot's document opened in the single-file viewer.</summary>
+    [Parameter] public EventCallback OnOpenInViewer { get; set; }
+    /// <summary>Previously stored files offered as a shortcut instead of re-uploading.</summary>
+    [Parameter] public IReadOnlyList<RecentSbom> Recent { get; set; } = [];
+
+    private int _dragCounter;
+    private string? _error;
+    private bool _drag => _dragCounter > 0;
+
+    private async Task OnFileChanged(InputFileChangeEventArgs e)
+    {
+        if (e.File is null) return;
+
+        _error = null;
+        _dragCounter = 0;
+
+        var result = await SbomLoader.LoadAsync(e.File);
+
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+
+        await OnLoaded.InvokeAsync(result);
+    }
+
+    private async Task OnClear()
+    {
+        _error = null;
+        await OnCleared.InvokeAsync();
+    }
+
+    private async Task OnOpen() => await OnOpenInViewer.InvokeAsync();
+
+    /// <summary>Fills this slot from a previously stored file instead of a fresh upload.</summary>
+    private async Task PickRecent(RecentSbom item)
+    {
+        _error = null;
+
+        var content = await RecentStore.GetContentAsync(item.Id);
+        if (content is null)
+        {
+            _error = "That file is no longer available in this browser.";
+            return;
+        }
+
+        var result = SbomLoader.Load(content, item.Name);
+        if (!result.Success)
+        {
+            _error = result.Error;
+            return;
+        }
+
+        await OnLoaded.InvokeAsync(result);
+    }
+}
