@@ -72,7 +72,9 @@ If you use a shared or public machine, be aware that recent files persist until 
 - [FIRST.org](https://www.first.org/epss/) — EPSS exploit-probability scores
 - [GitHub](https://github.com) — hosts the CISA KEV mirror, this repository, and issues
 - [Google Analytics](https://policies.google.com/privacy)
-- Microsoft Azure Static Web Apps — hosts the site
+- Microsoft Azure Static Web Apps — serves the site's static files. It is **static hosting only**:
+  there is no server-side code, no API and no database, so nothing you open in the app is processed
+  or stored there. Like any web host it sees the IP address and user-agent of each request
 
 ## Questions
 
