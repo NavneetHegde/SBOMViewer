@@ -12,7 +12,8 @@
     <div style="position:fixed; top:0; left:0; right:0; bottom:0; background:oklch(11% 0.018 240 / 0.85); display:flex; flex-direction:column; justify-content:center; align-items:center; gap:16px; z-index:1000;">
         <div class="spinner" style="width:40px; height:40px; border-width:3px;"></div>
         <div class="scan-running" style="padding:14px 24px; font-size:14px;">
-            Scanning @ChatState.ScanProgress / @ChatState.ScanTotal packages against OSV.dev…
+            @(ChatState.ScanPhase
+              ?? $"Scanning {ChatState.ScanProgress} / {ChatState.ScanTotal} packages against OSV.dev…")
         </div>
         <p style="font-size:12px; color:var(--text-dimmer);">All processing happens in your browser. No data leaves your machine.</p>
     </div>
@@ -418,6 +419,9 @@
 
         ChatState.IsScanning = true;
         ChatState.ScanError  = null;
+        // Warnings describe the scan that produced them, so a re-scan starts from a clean slate.
+        // Otherwise a repeatedly-failing enrichment stacks the same two banners on every attempt.
+        ChatState.ScanWarnings.Clear();
         _activeTab           = "vulns";
         ChatState.NotifyStateChanged();
 
@@ -444,6 +448,12 @@
                 {
                     ChatState.ScanWarnings.Add(msg);
                     ChatState.NotifyStateChanged();
+                },
+                onPhase: phase =>
+                {
+                    ChatState.ScanPhase = phase;
+                    ChatState.NotifyStateChanged();
+                    InvokeAsync(StateHasChanged);
                 });
 
             ChatState.VulnResults = results;
@@ -800,7 +810,8 @@
             return @<div class="content fadein" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:16px;">
                 <div class="scan-running" style="padding:16px 24px; font-size:14px;">
                     <div class="spinner" style="width:20px; height:20px; border-width:3px;"></div>
-                    Scanning @ChatState.ScanProgress / @ChatState.ScanTotal packages against OSV.dev…
+                    @(ChatState.ScanPhase
+                      ?? $"Scanning {ChatState.ScanProgress} / {ChatState.ScanTotal} packages against OSV.dev…")
                 </div>
                 <p style="font-size:12px; color:var(--text-dimmer);">All processing happens in your browser.</p>
             </div>;
@@ -861,14 +872,17 @@
                         @s
                     </button>
                 }
-                @if (kevCount > 0)
-                {
-                    <button class="filter-btn filter-btn-kev @(_vulnKevOnly ? "active" : "")"
-                            title="Show only vulnerabilities CISA has confirmed as exploited in the wild"
-                            @onclick="() => _vulnKevOnly = !_vulnKevOnly">
-                        ⚡ Exploited (@kevCount)
-                    </button>
-                }
+                @* Rendered even at zero. Hiding it would strand the filter in the on state after a
+                   re-scan where KEV enrichment failed — the list would filter to empty with no
+                   control left to switch it back off. *@
+                <button class="filter-btn filter-btn-kev @(_vulnKevOnly ? "active" : "")"
+                        disabled="@(kevCount == 0 && !_vulnKevOnly)"
+                        title="@(kevCount > 0
+                                 ? "Show only vulnerabilities CISA has confirmed as exploited in the wild"
+                                 : "No known-exploited vulnerabilities in these results")"
+                        @onclick="() => _vulnKevOnly = !_vulnKevOnly">
+                    ⚡ Exploited (@kevCount)
+                </button>
                 <button class="filter-btn @(_vulnHasFixOnly ? "active" : "")"
                         title="Show only vulnerabilities with a known fix version"
                         @onclick="() => _vulnHasFixOnly = !_vulnHasFixOnly">
