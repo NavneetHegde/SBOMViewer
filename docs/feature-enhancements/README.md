@@ -1,6 +1,6 @@
 # Feature Enhancements
 
-Three candidate features that deepen the value of the existing application for its current users. Each is scoped independently and can be implemented on its own.
+Candidate features that deepen the value of the existing application for its current users. Each is scoped independently and can be implemented on its own.
 
 The app today does one thing well: upload a single SBOM, browse it via a dynamic tabbed dashboard (overview / components / vulnerabilities / compliance), and scan against OSV.dev. These proposals address three gaps found in the current code:
 
@@ -8,7 +8,8 @@ The app today does one thing well: upload a single SBOM, browse it via a dynamic
 |---|---------|---------------|------|--------|
 | 1 | SBOM Diff | No way to compare two SBOMs — the question users have at every release | [sbom-diff-plan.md](sbom-diff-plan.md) | **Implemented** (phase 1) |
 | 2 | Data Exports | Nothing the app *derives* — license risk, scan results, the diff — can leave the browser in machine-readable form | [data-export-plan.md](data-export-plan.md) · [tasks](data-export-tasks.md) | Not started |
-| 3 | Vulnerability Triage | Severity says what *could* be bad; nothing says what is actually being exploited | [vulnerability-triage-plan.md](vulnerability-triage-plan.md) | Not started |
+| 3 | Vulnerability Triage | Severity says what *could* be bad; nothing says what is actually being exploited | [vulnerability-triage-plan.md](vulnerability-triage-plan.md) | **Implemented** |
+| 4 | User Feedback | No login, so no idea who uses the app or whether any of it lands | [user-feedback-plan.md](user-feedback-plan.md) | Not started |
 
 Feature 1's phase 2 — surfacing **newly introduced CVEs** between the two documents — is not yet built. See the plan for the API-cap consideration it raises.
 
