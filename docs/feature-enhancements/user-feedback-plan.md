@@ -257,6 +257,15 @@ and format alone removes the most common round-trip on any bug report.
 
 This is the best value-per-hour in the plan. It should ship whether or not anything else does.
 
+> **Implemented.** `Services/FeedbackLink.cs` builds the URL; a `Feedback` link sits in the footer
+> (`Home.razor`). The body carries app version, SBOM format label and browser string — never the
+> file name or any document content, since issues are public and a file name alone can name an
+> employer's unreleased product. The user reviews everything in GitHub's form before submitting.
+>
+> **Outstanding:** the `feedback` label does not exist on the repository. GitHub silently ignores an
+> unknown `labels` parameter, so the link works — but incoming reports will not be auto-labelled
+> until someone runs `gh label create feedback`.
+
 ## Files
 
 | File | Change |

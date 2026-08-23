@@ -66,6 +66,13 @@
                       Class="no-icon-margin" Style="font-size:0.85rem;">
             Download SBOM
         </FluentAnchor>
+        <span class="footer-sep">|</span>
+        @* Plain anchor rather than a JS-interop click: it works the moment the footer paints,
+           without waiting on the user-agent lookup, which only enriches the prefill. *@
+        <a class="footer-feedback" href="@FeedbackUrl" target="_blank" rel="noopener noreferrer"
+           title="Opens a pre-filled GitHub issue — you review it before submitting">
+            Feedback
+        </a>
     </footer>
 </div>
 
@@ -83,12 +90,29 @@
             ?.InformationalVersion.Split('+')[0]
         ?? "unknown";
 
+    private string? _userAgent;
+
+    /// <summary>
+    /// Recomputed per render so the SBOM format reflects whatever is open. The user agent only
+    /// enriches the prefill — the link is complete and usable before that interop call returns.
+    /// </summary>
+    private string FeedbackUrl => FeedbackLink.Build(
+        AppVersion,
+        SbomState.DetectedFormat is null ? null : SbomFormatLabel.For(SbomState.DetectedFormat),
+        _userAgent);
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             _theme = await JS.InvokeAsync<string>("sbomGetTheme");
             _fontScale = await JS.InvokeAsync<double>("sbomGetFontScale");
+
+            // Best-effort: a missing user agent just drops one line from the issue prefill, so a
+            // failure here must never surface to the user or block the render.
+            try { _userAgent = await JS.InvokeAsync<string>("sbomUserAgent"); }
+            catch (Exception) { /* leave null */ }
+
             StateHasChanged();
         }
     }
