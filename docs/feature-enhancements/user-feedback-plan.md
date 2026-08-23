@@ -38,10 +38,12 @@ screen makes the inaccuracy worse.
 
 ## Recommendation
 
-Do these in order. **Tiers 1 and 3 are worth doing regardless. Tier 2 is conditional** — see below.
+Do these in order. **Tier 0 blocks tier 1. Tiers 1 and 3 are worth doing regardless. Tier 2 is
+conditional** — see below.
 
 | Tier | What | Effort | New infra |
 |---|---|---|---|
+| 0 | Consent banner + `PRIVACY.md` | ~1 day | None |
 | 1 | GA4 custom events | Hours | None |
 | 2 | In-app rating widget + endpoint | Days | Azure Function + Table Storage |
 | 3 | Pre-filled GitHub issue link | Under an hour | None |
@@ -57,6 +59,86 @@ abuse-prone public endpoint, and a GDPR surface.
 usable sample. Building the widget first is guessing.
 
 ---
+
+## Tier 0 — Consent (decided: keep GA4, add a banner)
+
+**Decision taken.** GA4 stays; a consent banner gates it. The alternative considered and rejected was
+replacing GA4 with cookieless analytics (Plausible/Umami), which would have removed the consent
+question rather than managing it. Recorded here so the trade-off is not rediscovered later.
+
+**This is not a tier-1 prerequisite because tier 1 creates the problem — it is one because the
+problem already exists.** GA4 sets `_ga` cookies on load today, with no prior consent. Under the
+ePrivacy Directive (Art. 5(3)) — which is separate from, and additional to, GDPR — storing
+non-essential information on a device requires consent *before* it happens, and analytics cookies are
+not "strictly necessary" under most DPA guidance. That gap is live at v3.2.5 with zero product
+analytics. Tier 1 does not create it; it just raises the stakes.
+
+*Not legal advice. Worth a real opinion if the exposure matters.*
+
+### Requirements a banner has to actually meet
+
+Half-built cookie banners are worse than none — they carry the UX cost and still fail. The
+non-negotiables:
+
+1. **Prior consent.** GA must not set cookies before a choice is made. Today `index.html:61` loads
+   `gtag.js` immediately, so this is the substantive change.
+2. **Reject as easy as accept.** Equally prominent "Reject" and "Accept" — same size, same styling,
+   same screen. A prominent Accept beside a buried "Manage preferences" is the specific pattern EU
+   regulators have fined people for.
+3. **No implied consent.** Not from scrolling, not from continuing to use the app, no pre-ticked
+   boxes.
+4. **Revocable.** A footer link to change the choice later, next to the `PRIVACY.md` link.
+5. **Expiry.** Persist the choice; re-ask after ~6 months if refused, ~12 if granted.
+6. **Non-blocking.** The banner must not gate use of the app. Someone who ignores it entirely should
+   be able to upload and scan normally — they simply stay un-measured.
+
+### Where the code has to live
+
+**In `index.html`, as plain HTML/JS — not as a Blazor component.** Two reasons, and the first is
+disqualifying:
+
+- Blazor WASM takes seconds to boot. A banner that waits for it would appear well after the page is
+  interactive, and any `gtag` call before that has already happened. The gate has to run in the same
+  script block that currently loads GA.
+- It matches the existing convention — `sbomGetTheme`, `sbomSetFontScale` and friends are already
+  flat globals in `index.html`, and the banner can read the stored theme so it does not flash white
+  on a dark page.
+
+Use **Google Consent Mode v2**: push `default` as denied *before* `gtag.js` loads, then `update` on
+accept.
+
+```js
+gtag('consent', 'default', {
+  analytics_storage: 'denied', ad_storage: 'denied',
+  ad_user_data: 'denied',      ad_personalization: 'denied'
+});
+```
+
+Store the choice in `localStorage` under `sbom-consent` as `{ state, timestamp }`, alongside the
+existing `sbom-theme` and `sbom-font-scale` keys.
+
+**When consent is denied, send nothing at all** — no cookieless pings either. Consent Mode's denied
+state still transmits modelled pings, and while those arguably fall outside Art. 5(3) since nothing
+is stored on the device, "we send nothing unless you say yes" is a sentence that can be written in
+`PRIVACY.md` without a footnote. On a tool that trades on privacy claims, the defensible-in-one-line
+version is worth more than the extra data. `sbomTrack` must therefore check consent, not just rely on
+Consent Mode.
+
+### What this does to the numbers
+
+Recording the consequence so the data gets read correctly later, not to reopen the decision:
+
+measured traffic ≈ (visitors who do not block `google-analytics.com`) × (visitors who accept).
+For a developer and security audience that plausibly lands somewhere around **15–25%**, and it is
+**self-selected** — people who accept analytics are not a random sample of people who use the app.
+
+Practical consequence: treat tier-1 output as a **floor and a ratio**, never a population count.
+"Compare is used about a tenth as often as Scan" survives this. "We have 412 users" does not, and
+neither does "nobody uses Compliance" — a feature used exclusively by consent-refusing enterprise
+users would look identical to a dead one.
+
+This matters most for the tier-2 go/no-go, which keys off observed volume. Divide accordingly: a few
+hundred *measured* sessions a month may be a few thousand real ones.
 
 ## Tier 1 — GA4 custom events
 
@@ -180,7 +262,9 @@ This is the best value-per-hour in the plan. It should ship whether or not anyth
 | File | Change |
 |------|--------|
 | `Components/DynamicSbomViewer.razor` | **Fix** the inaccurate "No data leaves your machine" copy (`:18`, `:830`) |
-| `wwwroot/index.html` | `sbomTrack(name, params)` helper wrapping `gtag` |
+| `wwwroot/index.html` | Tier 0 — consent-mode defaults before `gtag.js`, banner markup, `sbomConsent*` helpers; and `sbomTrack(name, params)` wrapping `gtag`, gated on consent |
+| `wwwroot/css/app.css` | Banner styling, theme-aware like the rest |
+| `Pages/Home.razor` | Footer links — `PRIVACY.md`, and "Cookie settings" to revoke |
 | `Services/AnalyticsService.cs` | New — typed event calls + bucketing, so no component builds a raw payload |
 | Call sites | `SbomLoader`, `DynamicSbomViewer`, `Compare` — one `Track` call each |
 | `Pages/Home.razor` | Tier 3 footer link |
@@ -190,6 +274,23 @@ This is the best value-per-hour in the plan. It should ship whether or not anyth
 | `PRIVACY.md` | New — what is sent, to whom, why. Linked from the footer |
 
 ## Verification
+
+**Tier 0 — check in DevTools → Application → Cookies, not by reading the code.** The failure mode
+here is a banner that looks right and gates nothing.
+
+- On a first visit with no choice made: **no `_ga` cookie exists** and no request goes to
+  `google-analytics.com`. This is the whole feature; if it fails, nothing else matters.
+- Reject: still no cookie, still no request. Reload — still none, and the banner does not reappear.
+- Accept: cookie appears, events flow. Reload — no banner, events still flow.
+- Revoke via the footer after accepting: cookies cleared, requests stop.
+- Reject, then hand-age the `sbom-consent` timestamp past 6 months: the banner returns.
+- The app is fully usable with the banner ignored — upload, scan and compare all work while
+  un-measured.
+- The banner renders in the correct theme on a hard refresh with no white flash on a dark page, and
+  it appears *before* Blazor finishes booting.
+- `sbomTrack` no-ops when consent is absent or denied — verify by calling it from the console.
+
+**Tier 1 onwards:**
 
 - Confirm no event carries a file name, component name, purl, CVE id or license — assert this in a
   unit test over `AnalyticsService`, not by reading the call sites, so a later contributor adding a
@@ -205,10 +306,14 @@ This is the best value-per-hour in the plan. It should ship whether or not anyth
 - Re-read every privacy string in the app against what the network tab actually shows. The claim and
   the behaviour have already drifted apart once.
 
-## Open question
+## Open questions
 
-**Consent.** GA4 runs today with no banner. Adding product analytics does not change the legal
-position, but it does increase how much this matters if the audience is substantially EU-based —
-which, for an SBOM tool in the CRA era, it may well be. Worth a decision before Tier 1 ships, not
-after. A one-line "we use analytics, here's what we collect" in `PRIVACY.md` plus a footer link is
-the minimum; a full consent banner is a bigger conversation about whether GA is worth keeping at all.
+- **Re-prompt intervals.** 6 months after refusal and 12 after consent are conventional rather than
+  prescribed. Pick deliberately; re-asking too often is its own dark pattern.
+- **Whether a banner is needed for non-EU visitors.** Geo-gating it is possible but needs a
+  reasonably accurate signal, and SWA Free gives no server-side geo. Showing it to everyone is
+  simpler and more defensible; the cost is a banner for visitors who did not need one.
+- **Tier 2's endpoint is a separate consent question.** The rating widget posts data the user typed
+  on purpose, which is a different basis from analytics cookies — but the install-id GUID in
+  `localStorage` is device storage, so it needs the same Art. 5(3) look. Settle it when tier 2 is
+  actually greenlit, not now.
