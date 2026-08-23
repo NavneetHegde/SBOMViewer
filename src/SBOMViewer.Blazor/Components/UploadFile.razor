@@ -1,46 +1,84 @@
 @using System.Text.Json
+@using SBOMViewer.Blazor.Models
 @inject SbomState SbomState
-@inject SchemaService SchemaService
+@inject SbomLoader SbomLoader
 @inject ChatState ChatState
+@inject RecentSbomStore RecentStore
+@inject NavigationManager Nav
 
 <div class="upload-screen">
     <div class="upload-grid"></div>
 
     <div class="upload-hero fadein">
         <h1>Inspect your <span>SBOM</span><br />in seconds.</h1>
-        <p>Upload any Software Bill of Materials file. Vulnerabilities, licenses, and dependencies — all in one place.</p>
+        <p>Vulnerabilities, licenses, and dependencies — explored entirely in your browser.</p>
     </div>
 
-    <div class="dropzone @(_drag ? "dragover" : "") fadein"
-         style="animation-delay:0.1s; position:relative;"
-         @ondragenter="OnDragEnter"
-         @ondragleave="OnDragLeave"
-         @ondragover:preventDefault="true"
-         @ondrop="OnDrop">
+    <div class="upload-options">
+        <div class="dropzone @(_drag ? "dragover" : "") fadein"
+             style="animation-delay:0.1s; position:relative;"
+             @ondragenter="OnDragEnter"
+             @ondragleave="OnDragLeave"
+             @ondragover:preventDefault="true"
+             @ondrop="OnDrop">
 
-        <!-- InputFile covers entire dropzone — handles both click-to-browse and drag-and-drop -->
-        <InputFile style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2; width:100%; height:100%; outline:none;"
-                   accept=".json"
-                   OnChange="OnFileChanged" />
+            <!-- InputFile covers entire dropzone — handles both click-to-browse and drag-and-drop -->
+            <InputFile style="position:absolute; inset:0; opacity:0; cursor:pointer; z-index:2; width:100%; height:100%; outline:none;"
+                       accept=".json"
+                       OnChange="OnFileChanged" />
 
-        <!-- Visual content -->
-        <div style="position:relative; z-index:1; pointer-events:none; display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; width:100%;">
-            <div class="dropzone-icon">📄</div>
-            <h3>Drop SBOM file here</h3>
-            <p>or click to browse your files</p>
-            <div class="dropzone-formats">
-                @foreach (var version in SbomFormatDetector.SupportedVersions)
-                {
-                    <span class="format-chip">@version</span>
-                }
-                <span class="format-chip">JSON</span>
+            <!-- Visual content -->
+            <div style="position:relative; z-index:1; pointer-events:none; display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; width:100%;">
+                <div class="dropzone-icon">📄</div>
+                <h3>Inspect one SBOM</h3>
+                <p>Drop a file here, or click to browse</p>
+                <div class="dropzone-formats">
+                    @foreach (var version in SbomFormatDetector.SupportedVersions)
+                    {
+                        <span class="format-chip">@version</span>
+                    }
+                    <span class="format-chip">JSON</span>
+                </div>
             </div>
         </div>
+
+        <a class="compare-card fadein" href="compare" style="animation-delay:0.16s;">
+            <div class="dropzone-icon">⇄</div>
+            <h3>Compare two SBOMs</h3>
+            <p>See what changed between two releases</p>
+            <ul class="compare-card-points">
+                <li>Components added &amp; removed</li>
+                <li>Version bumps</li>
+                <li>New license risk</li>
+                <li>Works across formats</li>
+            </ul>
+            <span class="compare-card-btn">Compare →</span>
+        </a>
     </div>
 
     @if (!string.IsNullOrEmpty(_errorMessage))
     {
         <div class="upload-error fadein">⚠ @_errorMessage</div>
+    }
+
+    @if (_recent.Count > 0)
+    {
+        <div class="recent-bar fadein" style="animation-delay:0.24s;">
+            <div class="recent-bar-head">
+                <span class="recent-bar-title">Recent</span>
+                <button class="recent-clear" @onclick="ClearRecent" title="Forget the files stored in this browser">Clear</button>
+            </div>
+            <div class="recent-list">
+                @foreach (var item in _recent)
+                {
+                    <button class="recent-item" @onclick="() => OpenRecent(item)" title="@item.Name">
+                        <span class="recent-item-name">@item.Name</span>
+                        <span class="recent-item-meta">@item.Format · @item.SizeLabel · @item.SavedAgo(DateTimeOffset.Now)</span>
+                    </button>
+                }
+            </div>
+            <p class="recent-note">Kept in this browser only — never uploaded anywhere.</p>
+        </div>
     }
 
     @if (_isLoading)
@@ -57,7 +95,56 @@
     private string? _errorMessage;
     private int _dragCounter;
 
+    private IReadOnlyList<RecentSbom> _recent = [];
+
     private bool _drag => _dragCounter > 0;
+
+    protected override async Task OnInitializedAsync() => await RefreshRecent();
+
+    private async Task RefreshRecent() => _recent = await RecentStore.ListAsync();
+
+    private async Task OpenRecent(RecentSbom item)
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            var content = await RecentStore.GetContentAsync(item.Id);
+            if (content is null)
+            {
+                // The entry was evicted or the store became unreachable — drop it from the list.
+                _errorMessage = "That file is no longer available in this browser.";
+                await RefreshRecent();
+                return;
+            }
+
+            var result = SbomLoader.Load(content, item.Name);
+            if (!result.Success)
+            {
+                _errorMessage = result.Error;
+                return;
+            }
+
+            ChatState.ClearVulnerabilities();
+            SbomState.Schema         = result.Schema;
+            SbomState.DetectedFormat = result.Format;
+            SbomState.FileName       = result.FileName;
+            SbomState.Document       = result.Document;
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ClearRecent()
+    {
+        await RecentStore.ClearAsync();
+        await RefreshRecent();
+    }
 
     private void OnDragEnter() => _dragCounter++;
     private void OnDragLeave() { _dragCounter = Math.Max(0, _dragCounter - 1); }
@@ -68,20 +155,6 @@
         var file = e.File;
         if (file == null) return;
 
-        if (file.Size > 20 * 1024 * 1024)
-        {
-            _errorMessage = "File size exceeds the 20MB limit.";
-            StateHasChanged();
-            return;
-        }
-
-        if (!file.Name.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-        {
-            _errorMessage = "Only .json files are supported.";
-            StateHasChanged();
-            return;
-        }
-
         _isLoading = true;
         _errorMessage = null;
         _dragCounter = 0;
@@ -90,54 +163,19 @@
 
         try
         {
-            using var stream = file.OpenReadStream(20 * 1024 * 1024);
-            using var reader = new StreamReader(stream);
-            string content = await reader.ReadToEndAsync();
+            var result = await SbomLoader.LoadAsync(file);
 
-            var result = SbomFormatDetector.DetectWithDetails(content);
-
-            if (result.IsUnsupportedVersion)
+            if (!result.Success)
             {
-                _errorMessage = $"Version \"{result.DetectedVersion}\" is not supported. Supported versions: {string.Join(", ", SbomFormatDetector.SupportedVersions)}.";
+                _errorMessage = result.Error;
                 SbomState.Clear();
+                return;
             }
-            else if (result.Format == null)
-            {
-                _errorMessage = "Unrecognized SBOM format. Please upload a valid CycloneDX or SPDX JSON file.";
-                SbomState.Clear();
-            }
-            else
-            {
-                try
-                {
-                    var jsonDoc = JsonDocument.Parse(content, new JsonDocumentOptions
-                    {
-                        CommentHandling = JsonCommentHandling.Skip,
-                        AllowTrailingCommas = true
-                    });
 
-                    var validationError = SbomFormatDetector.Validate(jsonDoc.RootElement, result.Format.Value);
-                    if (validationError != null)
-                    {
-                        _errorMessage = validationError;
-                        jsonDoc.Dispose();
-                        SbomState.Clear();
-                    }
-                    else
-                    {
-                        var schema = SchemaService.BuildFromJson(jsonDoc.RootElement);
-                        SbomState.Schema = schema;
-                        SbomState.DetectedFormat = result.Format;
-                        SbomState.FileName = file.Name;
-                        SbomState.Document = jsonDoc;
-                    }
-                }
-                catch (JsonException)
-                {
-                    _errorMessage = "Failed to parse JSON. Please check the file is valid JSON.";
-                    SbomState.Clear();
-                }
-            }
+            SbomState.Schema = result.Schema;
+            SbomState.DetectedFormat = result.Format;
+            SbomState.FileName = result.FileName;
+            SbomState.Document = result.Document;
         }
         finally
         {

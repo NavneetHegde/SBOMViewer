@@ -56,9 +56,11 @@ SBOMViewer.slnx
 │       ├── Layout/
 │       │   └── MainLayout.razor        # App shell: header, toolbar, body, footer, theme toggle
 │       ├── Pages/
-│       │   └── Home.razor              # Main page — renders DynamicSbomViewer based on SbomState
+│       │   ├── Home.razor              # Main page — nav actions (export/compare/new) + DynamicSbomViewer
+│       │   └── Compare.razor           # SBOM diff page (/compare) — two-slot upload + change tables
 │       ├── Components/
-│       │   ├── UploadFile.razor        # File upload, format detection, validation, JSON parsing
+│       │   ├── UploadFile.razor        # File upload screen — delegates parsing to SbomLoader
+│       │   ├── CompareSlot.razor       # One baseline/current dropzone slot used by Compare.razor
 │       │   ├── DynamicSbomViewer.razor # Top-level viewer — FluentCard + FluentAccordion sections + vuln scan
 │       │   ├── DynamicSection.razor    # Array/object renderer — search, scroll, details/summary
 │       │   ├── DynamicObject.razor     # Recursive object renderer — key-value, badges, nested
@@ -66,6 +68,10 @@ SBOMViewer.slnx
 │       │   └── VulnerabilityBadge.razor    # Colored severity badge (Critical/High/Medium/Low)
 │       ├── Services/
 │       │   ├── SbomState.cs            # Singleton state: JsonDocument, SchemaNode, format, filename
+│       │   ├── SbomLoader.cs           # Shared detect → validate → build-schema pipeline (+ saves recents)
+│       │   ├── RecentSbomStore.cs      # IndexedDB-backed last-2-uploads store (best-effort)
+│       │   ├── SbomCompareState.cs     # Singleton state: baseline + current documents, computed diff
+│       │   ├── SbomDiffService.cs      # Component-level diff over ComponentRow lists
 │       │   ├── SbomFormatDetector.cs   # Format detection + lightweight required-field validation
 │       │   ├── SchemaService.cs        # Builds SchemaNode tree from uploaded JSON, applies render hints
 │       │   ├── ChatState.cs            # Singleton state: vuln results, scan progress, warnings, chat messages
@@ -75,6 +81,9 @@ SBOMViewer.slnx
 │       │   └── VulnerabilityService.cs # OSV.dev two-phase scan: batch query + per-vuln detail fetch
 │       ├── Models/
 │       │   ├── SbomFormat.cs           # Enum: CycloneDX_1_5/1_6/1_7, SPDX_2_2/2_3/3_0
+│       │   ├── SbomDiff.cs             # SbomDiff, ComponentChange, DiffChangeKind
+│       │   ├── RecentSbom.cs           # Stored-file metadata + size/age labels
+│       │   ├── SbomFormatLabel.cs      # SbomFormat → display string
 │       │   ├── SchemaNode.cs           # SchemaNode, SchemaNodeType, RenderHint
 │       │   ├── PackageInfo.cs          # Package name, version, ecosystem, purl
 │       │   ├── ComponentRow.cs         # Name, Version, Type, License, Purl, Risk — row shown in Components/Compliance tabs
@@ -85,6 +94,8 @@ SBOMViewer.slnx
 │           ├── index.html              # Host page (SEO meta, Google Analytics, Fluent theme loader)
 │           ├── robots.txt              # Search engine crawl rules
 │           ├── sitemap.xml             # Sitemap for SEO
+│           ├── staticwebapp.config.json # Azure SWA SPA fallback so client routes (/compare) resolve
+│           ├── js/sbom-recent.js       # IndexedDB helpers for the recent-files store
 │           └── css/app.css             # App styles
 └── tests/
     ├── SBOMViewer.Blazor.Tests/
@@ -97,13 +108,18 @@ SBOMViewer.slnx
     │       ├── ChatStateTests.cs       # ChatState event, clear, and vuln state tests
     │       ├── PackageExtractorTests.cs    # Package extraction from CycloneDX (1.5/1.6/1.7) + SPDX (2.2/2.3/3.0)
     │       ├── ComponentRowExtractorTests.cs # ComponentRow extraction + license risk classification per format
+    │       ├── SbomLoaderTests.cs       # Shared load pipeline: success, bad format, failed validation
+    │       ├── SbomDiffServiceTests.cs  # purl identity, add/remove/version/license, cross-format, edge cases
+    │       ├── SbomCompareStateTests.cs # Two-slot state, diff recomputation, clear/replace
     │       ├── LicenseClassifierTests.cs   # License identifier → LicenseRisk classification tests
     │       └── VulnerabilityServiceTests.cs # OSV.dev API client tests
     └── SBOMViewer.E2E.Tests/
         ├── PlaywrightSetup.cs          # One-time Chromium install ([SetUpFixture])
         ├── TestBase.cs                 # PageTest base — reads BASE_URL env var, waits for Blazor bootstrap
         ├── HomePageTests.cs            # Smoke tests: title, header, upload button, badges, card, theme, footer
-        └── FileUploadTests.cs          # Upload tests: CycloneDX 1.5/1.6/1.7, SPDX 2.2/2.3/3.0.1, unsupported, invalid JSON, search
+        ├── FileUploadTests.cs          # Upload tests: CycloneDX 1.5/1.6/1.7, SPDX 2.2/2.3/3.0.1, unsupported, invalid JSON, search
+        ├── CompareTests.cs             # /compare route, two-slot upload, identical files, cross-format diff, swap, reset
+        └── RecentSbomTests.cs          # IndexedDB persistence, 2-entry cap, dedup, clear, slot shortcut
 ```
 
 ## Environment
@@ -153,6 +169,38 @@ User-initiated vulnerability scanning via the [OSV.dev](https://osv.dev) API —
 - **VulnerabilitySummary** — top-level severity breakdown badges, searchable list of affected packages with per-severity badge breakdown per package (not a single combined badge), expandable CVE details with links to OSV.dev
 - **VulnerabilityBadge** — colored severity badge; MEDIUM uses dark text (`#1a1a1a`) on amber background for legibility
 
+### SBOM Diff (`/compare`)
+
+Compares two SBOM documents entirely in the browser — no login, no database, no upload. Both `JsonDocument`s are held in memory for the lifetime of the tab; a page refresh discards them.
+
+- **SbomLoader** — the shared `detect → validate → BuildFromJson` pipeline (20MB cap, `.json` only). Both `UploadFile.razor` and `CompareSlot.razor` call it, so size limits, format support and error wording cannot drift apart. Returns an `SbomLoadResult`; on failure the parsed `JsonDocument` is disposed rather than leaked
+- **SbomCompareState** — singleton holding the baseline and current slots plus the computed `SbomDiff`. `Diff` is null until both slots are filled, and is recomputed whenever either slot changes. Replacing or clearing a slot disposes the previous `JsonDocument`
+- **SbomDiffService** — diffs the `ComponentRow` lists produced by `ComponentRowExtractor`, not raw JSON, so a baseline in one format can be compared against a current document in another (e.g. SPDX 2.2 vs CycloneDX 1.6). Matching runs in two passes:
+  - **Pass 1** on version-stripped purl. `PurlIdentity` strips the subpath, qualifiers and version segment — **a purl embeds the version, so matching on the raw purl would report every version bump as an add plus a remove.** Scoped npm names encode `@` as `%40`, so the *last* `@` is the version separator
+  - **Pass 2** on component name (case-insensitive), for whatever pass 1 left unmatched. This is what makes cross-format comparison work when one side carries no purl
+  - Duplicate identities within a document are paired in document order; surplus occurrences fall through to added/removed. A component whose version *and* license both changed is reported in both buckets
+- **Compare.razor / CompareSlot.razor** — two-slot dropzone, four stat cards, and a tab per change bucket with a searchable `data-table`. When only one slot is filled, the other is highlighted (`.compare-dropzone.awaiting`) and the hint names the file already chosen
+
+Two entry points:
+- **Landing page** — a `.compare-cta` card below the dropzone in `UploadFile.razor`
+- **From the viewer** — `CompareWithAnother()` in `Home.razor` seeds the open file as the baseline and navigates to `/compare`. It **re-parses via `GetRawText()` rather than sharing `SbomState`'s `JsonDocument`**: both states own and dispose their documents, so sharing one instance would leave the compare page holding a disposed document once the viewer is cleared
+
+- **Swap** — the control between the slots calls `SbomCompareState.Swap()`, exchanging the two slots and recomputing so the diff runs the other way (Added and Removed trade places). No document is created or disposed, so it is safe with one slot filled or both. Recovers from files chosen in the wrong order, and from the viewer handoff always seeding the open file as the *baseline*
+- **Back to a single file** — each filled slot has "↗ Open in viewer" (`OpenInViewer()` in `Compare.razor`), which loads that document into `SbomState` and navigates to `/`. Also re-parsed, for the same ownership reason. The comparison is left intact, and `CompareWithAnother()` detects that the open file is already one side of it and navigates back instead of resetting
+
+Document-level actions (Export Report, Compare, New file) live in the top nav in `Home.razor`, not in the viewer sidebar. Their labels are wrapped in `.nav-action-label`, which collapses to icon-only below 940px so the bar cannot overflow.
+
+### Recent SBOMs (IndexedDB)
+
+The most recent **2** uploads are kept in IndexedDB so they can be reopened on a later visit without locating the file again. Storage is local to the browser — nothing is transmitted.
+
+- **`wwwroot/js/sbom-recent.js`** — flat `sbomRecent*` globals (`Save`/`List`/`Get`/`Clear`), matching the naming convention of the inline scripts in `index.html`. Metadata and file content live in **separate object stores** so listing recents does not read tens of megabytes back out. `sbomRecentSave` does all its reads and writes inside one transaction — awaiting between steps would let the transaction go inactive. Re-uploading a file replaces its earlier entry rather than duplicating it
+- **`RecentSbomStore`** — thin interop wrapper. **Every call is best-effort**: IndexedDB is unavailable in some private-browsing modes, can be disabled, and can hit quota. Failures degrade to "no recents" and must never break an upload
+- **`SbomLoader.LoadAsync`** saves; the `Load(string, string)` overload does not. That split is deliberate — the string overload is used to re-parse a document when handing it between the viewer and the compare page, and those hand-offs must not churn the history
+- **UI** — a "Recent" row under the two cards on the landing page (click to reopen, plus Clear), and `Recent:` shortcut chips inside an empty comparison slot. The chips sit *outside* the dropzone because the `InputFile` overlay covers that whole area
+
+Because files now persist, the compare page's privacy copy says "nothing is sent to a server" rather than the previous "nothing is stored".
+
 ### License Risk & Compliance Reporting
 
 - **ComponentRowExtractor** — extracts `ComponentRow` (name, version, type, license, purl, risk) per component/package, format-aware (CycloneDX `components[].licenses`, SPDX 2.x `packages[].licenseConcluded`, SPDX 3.0 `@graph` `software_Package` elements' `software_concludedLicenseExpression`/`software_declaredLicenseExpression`)
@@ -165,6 +213,8 @@ User-initiated vulnerability scanning via the [OSV.dev](https://osv.dev) API —
 - `SchemaNodeType` enum — String, Integer, Number, Boolean, Array, Object, Unknown
 - `RenderHint` enum — Auto, AccordionSection, SearchableList, BadgeList, KeyValueGroup
 - `SbomFormat` enum — CycloneDX_1_5, CycloneDX_1_6, CycloneDX_1_7, SPDX_2_2, SPDX_2_3, SPDX_3_0
+- `SbomDiff` record — Added, Removed, VersionChanged, LicenseChanged, UnchangedCount, BaselineCount, CurrentCount
+- `ComponentChange` record — Key, Name, Baseline/Current `ComponentRow` (one is null for adds/removes), Kind
 - `PackageInfo` record — Name, Version, Ecosystem, Purl
 - `ComponentRow` record — Name, Version, Type, License, Purl, Risk
 - `LicenseRisk` enum — Permissive, WeakCopyleft, StrongCopyleft, Proprietary, Unknown

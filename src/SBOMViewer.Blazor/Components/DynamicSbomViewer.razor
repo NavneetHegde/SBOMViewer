@@ -5,7 +5,6 @@
 @inject ChatState ChatState
 @inject VulnerabilityService VulnService
 @inject SbomState SbomState
-@inject IJSRuntime JS
 
 @* ── Scan overlay ── *@
 @if (ChatState.IsScanning)
@@ -102,9 +101,6 @@
                 <div class="sbom-meta-row"><span>Components</span><span>@_componentCount</span></div>
             </div>
 
-            <button class="btn-ghost" style="margin:10px 12px 0; width:calc(100% - 24px);" @onclick="ExportReport">
-                ⤓ Export Report
-            </button>
         </div>
 
         @* ── Main area ── *@
@@ -316,7 +312,6 @@
 
     private void SetTab(string tab) { _activeTab = tab; }
 
-    private async Task ExportReport() => await JS.InvokeVoidAsync("sbomPrintReport");
 
     // ── Data derivation ────────────────────────────────────────────────────────
 
