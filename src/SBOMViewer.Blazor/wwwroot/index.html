@@ -117,6 +117,8 @@
       setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     };
     window.sbomPrintReport = function () { window.print(); };
+    /* Used only to pre-fill a GitHub issue the user then reviews and submits themselves. */
+    window.sbomUserAgent = function () { return navigator.userAgent || ''; };
   </script>
 
   <!-- Recent-SBOM storage (IndexedDB). Separate file — too long to keep inline above. -->
