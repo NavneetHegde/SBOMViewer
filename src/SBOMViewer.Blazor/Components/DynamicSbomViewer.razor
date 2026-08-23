@@ -274,8 +274,11 @@
     private bool    _compSortAsc   = true;
 
     // Vuln tab state
-    private string  _vulnSearch    = "";
-    private string? _vulnSevFilter = null;
+    private string  _vulnSearch     = "";
+    private string? _vulnSevFilter  = null;
+    private string  _vulnSortCol    = "cvss";   // cvss | epss | name
+    private bool    _vulnKevOnly    = false;
+    private bool    _vulnHasFixOnly = false;
     private HashSet<string> _expandedVulns = [];
 
     // Compliance tab state
@@ -819,8 +822,9 @@
 
         var vulns = ChatState.VulnResults?
             .SelectMany(r => r.Vulnerabilities.Select(v => (r.PackageName, r.PackageVersion, v)))
-            .OrderByDescending(x => x.v.CvssScore ?? 0)
             .ToList() ?? [];
+
+        var kevCount = vulns.Count(x => x.v.IsKnownExploited);
 
         var q = _vulnSearch.ToLowerInvariant();
         if (!string.IsNullOrEmpty(q))
@@ -828,6 +832,18 @@
                                      x.PackageName.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
         if (_vulnSevFilter is not null)
             vulns = vulns.Where(x => x.v.Severity == _vulnSevFilter).ToList();
+        if (_vulnKevOnly)
+            vulns = vulns.Where(x => x.v.IsKnownExploited).ToList();
+        if (_vulnHasFixOnly)
+            vulns = vulns.Where(x => x.v.FixedVersion is not null).ToList();
+
+        vulns = _vulnSortCol switch
+        {
+            // Unscored CVEs sort last rather than as zero — "not scored" is not "harmless".
+            "epss" => vulns.OrderByDescending(x => x.v.EpssScore ?? -1).ToList(),
+            "name" => vulns.OrderBy(x => x.PackageName, StringComparer.OrdinalIgnoreCase).ToList(),
+            _      => vulns.OrderByDescending(x => x.v.CvssScore ?? 0).ToList(),
+        };
 
         return @<div style="display:flex; flex-direction:column; height:100%; overflow:hidden;" class="fadein">
             <div class="toolbar">
@@ -844,8 +860,27 @@
                         @s
                     </button>
                 }
+                @if (kevCount > 0)
+                {
+                    <button class="filter-btn filter-btn-kev @(_vulnKevOnly ? "active" : "")"
+                            title="Show only vulnerabilities CISA has confirmed as exploited in the wild"
+                            @onclick="() => _vulnKevOnly = !_vulnKevOnly">
+                        ⚡ Exploited (@kevCount)
+                    </button>
+                }
+                <button class="filter-btn @(_vulnHasFixOnly ? "active" : "")"
+                        title="Show only vulnerabilities with a known fix version"
+                        @onclick="() => _vulnHasFixOnly = !_vulnHasFixOnly">
+                    Has fix
+                </button>
                 <div class="toolbar-right">
                     <span class="count-label">@vulns.Count vulnerabilities</span>
+                    <select class="sort-select" title="Sort by"
+                            value="@_vulnSortCol" @onchange="OnVulnSortChanged">
+                        <option value="cvss">Sort: CVSS</option>
+                        <option value="epss">Sort: EPSS</option>
+                        <option value="name">Sort: Package</option>
+                    </select>
                     <button class="btn-primary" @onclick="ScanVulnerabilities" disabled="@ChatState.IsScanning">
                         ↻ Re-scan
                     </button>
@@ -885,13 +920,25 @@
                                 <div class="vuln-card-header">
                                     <div>
                                         @SevBadge(vuln.Severity ?? "NONE")
+                                        @if (vuln.IsKnownExploited)
+                                        {
+                                            <span class="kev-pill" title="CISA Known Exploited Vulnerability — confirmed exploited in the wild">⚡ EXPLOITED</span>
+                                        }
                                         <div class="vuln-id">@vid</div>
                                         <div class="vuln-pkg">@pkgName@@pkgVer</div>
                                     </div>
-                                    @if (vuln.CvssScore.HasValue)
-                                    {
-                                        <div class="vuln-score" style="color:@scoreCol">@vuln.CvssScore.Value.ToString("F1")</div>
-                                    }
+                                    <div class="vuln-scores">
+                                        @if (vuln.EpssScore.HasValue)
+                                        {
+                                            <div class="vuln-epss" title="EPSS — probability of exploitation in the next 30 days">
+                                                @EpssDisplay(vuln.EpssScore.Value) <span class="vuln-epss-label">EPSS</span>
+                                            </div>
+                                        }
+                                        @if (vuln.CvssScore.HasValue)
+                                        {
+                                            <div class="vuln-score" style="color:@scoreCol">@vuln.CvssScore.Value.ToString("F1")</div>
+                                        }
+                                    </div>
                                 </div>
                                 @if (isExpand)
                                 {
@@ -913,6 +960,25 @@
                                                 <div class="vuln-meta-label">Severity</div>
                                                 <div class="vuln-meta-val">@(vuln.Severity ?? "Unknown")@(vuln.CvssScore.HasValue ? $" ({vuln.CvssScore:F1})" : "")</div>
                                             </div>
+                                            @if (vuln.EpssScore.HasValue)
+                                            {
+                                                <div>
+                                                    <div class="vuln-meta-label">Exploit probability (EPSS)</div>
+                                                    <div class="vuln-meta-val">@EpssDisplay(vuln.EpssScore.Value) in the next 30 days</div>
+                                                </div>
+                                            }
+                                            @if (vuln.IsKnownExploited)
+                                            {
+                                                <div>
+                                                    <div class="vuln-meta-label">CISA KEV</div>
+                                                    <div class="vuln-meta-val">
+                                                        <a class="vuln-link" target="_blank"
+                                                           href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog">
+                                                            Confirmed exploited in the wild ↗
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            }
                                         </div>
                                         @if (vuln.FixedVersion is not null)
                                         {
@@ -942,6 +1008,20 @@
     {
         if (!_expandedVulns.Remove(key)) _expandedVulns.Add(key);
     }
+
+    private void OnVulnSortChanged(ChangeEventArgs e) =>
+        _vulnSortCol = e.Value?.ToString() ?? "cvss";
+
+    /// <summary>
+    /// EPSS as a percentage. Scores below 1% round to "&lt;1%" rather than "0%" — the difference
+    /// between a scored-but-unlikely CVE and an unscored one matters, and unscored renders nothing.
+    /// </summary>
+    private static string EpssDisplay(double score) => score switch
+    {
+        >= 0.995 => "100%",
+        >  0     and < 0.01 => "<1%",
+        _        => (score * 100).ToString("F0") + "%"
+    };
 
     private static RenderFragment SevBadge(string? sev)
     {
