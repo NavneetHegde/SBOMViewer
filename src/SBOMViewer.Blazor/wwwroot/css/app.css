@@ -37,6 +37,8 @@
   --med:   oklch(58% 0.18 80);
   --low:   oklch(50% 0.18 150);
   --info:  oklch(52% 0.15 255);
+  /* Foreground for anything filled with --crit. Light theme's crit is dark, so text goes light. */
+  --on-crit: oklch(98% 0 0);
 }
 [data-theme="dark"] {
   --crit:  oklch(70% 0.22 20);
@@ -44,6 +46,9 @@
   --med:   oklch(82% 0.18 85);
   --low:   oklch(74% 0.2 150);
   --info:  oklch(72% 0.18 255);
+  /* Dark theme lightens crit to 70% for legibility against the dark page, which makes white text
+     on top of it low-contrast — so filled-crit text flips dark, as the MEDIUM badge already does. */
+  --on-crit: oklch(22% 0.04 20);
 }
 
 /* ── Shared layout vars ────────────────────────────────────────────────────── */
@@ -181,14 +186,16 @@ body {
 .app-footer .footer-sep {
   margin: 0 10px; color: var(--border);
 }
-.app-footer .footer-download {
+/* One treatment for every footer link, so they stay identical as more are added. Replaces the
+   old .footer-download rules, which nothing referenced after the markup moved to FluentAnchor. */
+.app-footer .footer-link {
   background: none; border: none; padding: 0; cursor: pointer;
   color: var(--accent); font-family: var(--mono); font-size: 0.75rem;
   text-decoration: underline; text-underline-offset: 2px;
   transition: opacity 0.15s;
 }
-.app-footer .footer-download:hover { opacity: 0.75; }
-.app-footer .footer-download:disabled { color: var(--text-dimmer); text-decoration: none; cursor: default; opacity: 1; }
+.app-footer .footer-link:hover { opacity: 0.75; }
+.app-footer .footer-link:disabled { color: var(--text-dimmer); text-decoration: none; cursor: default; opacity: 1; }
 
 .btn-primary {
   background: var(--accent); border: none; color: #fff;
@@ -346,8 +353,22 @@ body {
 }
 .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
 .filter-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+/* KEV filter — reads in the critical colour rather than the accent, because "actively exploited"
+   outranks every severity band. Same geometry as .filter-btn so the row stays even. */
+.filter-btn-kev { border-color: color-mix(in oklch, var(--crit) 40%, var(--border)); color: var(--crit); }
+.filter-btn-kev:hover { border-color: var(--crit); color: var(--crit); }
+.filter-btn-kev.active {
+  border-color: var(--crit); color: var(--crit);
+  background: color-mix(in oklch, var(--crit) 12%, transparent);
+}
 .toolbar-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 .count-label { font-size: 0.8125rem; color: var(--text-dimmer); font-family: var(--mono); }
+.sort-select {
+  background: var(--bg2); border: 1px solid var(--border); color: var(--text-dim);
+  padding: 7px 10px; border-radius: var(--radius); font-size: 0.8125rem; font-weight: 600;
+  font-family: var(--sans); cursor: pointer;
+}
+.sort-select:hover { border-color: var(--accent); color: var(--accent); }
 
 .content { flex: 1; overflow-y: auto; padding: 22px; background: var(--bg); }
 
@@ -446,9 +467,70 @@ body {
 .vuln-card-body { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px; }
 .vuln-id  { font-family: var(--mono); font-size: 0.875rem; font-weight: 600; color: var(--text); margin-top: 8px; }
 .vuln-pkg { font-size: 0.8125rem; color: var(--text-dim); margin-top: 3px; font-family: var(--mono); }
+/* Wraps the EPSS figure and the CVSS score. Carries the margin-left:auto that .vuln-score
+   used to own, so the pair stays right-aligned in the card header. */
+.vuln-scores {
+  margin-left: auto; flex-shrink: 0; display: flex; align-items: baseline; gap: 14px;
+}
 .vuln-score {
-  margin-left: auto; font-family: var(--mono); font-size: 1.75rem; font-weight: 700;
-  letter-spacing: -0.04em; line-height: 1; flex-shrink: 0;
+  font-family: var(--mono); font-size: 1.75rem; font-weight: 700;
+  letter-spacing: -0.04em; line-height: 1;
+}
+/* EPSS sits next to CVSS, so it is deliberately the smaller of the two: it qualifies the severity
+   rather than competing with it. Banded because EPSS is heavily skewed — most CVEs score under 1%,
+   and a linear ramp would render almost every card identically. */
+.vuln-epss {
+  display: inline-flex; align-items: baseline; gap: 5px;
+  font-family: var(--mono); font-size: 1rem; font-weight: 700;
+  line-height: 1; white-space: nowrap;
+  padding: 5px 9px; border-radius: 6px; border: 1px solid transparent;
+}
+.vuln-epss-label { font-size: 0.625rem; font-weight: 600; letter-spacing: 0.07em; opacity: 0.75; }
+.vuln-epss.epss-high {
+  color: var(--crit);
+  border-color: color-mix(in oklch, var(--crit) 35%, transparent);
+  background: color-mix(in oklch, var(--crit) 10%, transparent);
+}
+.vuln-epss.epss-mid {
+  color: var(--med);
+  border-color: color-mix(in oklch, var(--med) 35%, transparent);
+  background: color-mix(in oklch, var(--med) 10%, transparent);
+}
+.vuln-epss.epss-low { color: var(--text-dimmer); }
+
+/* Legend for the two exploitability signals. Both acronyms are jargon, and the whole point of the
+   feature is lost if the reader cannot tell what they are being shown — so the swatches here are
+   the real components, not mock-ups, and drift with them. */
+.vuln-legend {
+  margin: 12px 20px 0; padding: 16px 18px;
+  background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius);
+  font-size: 0.8125rem; color: var(--text-dim); line-height: 1.6;
+}
+.vuln-legend-row { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 12px; }
+.vuln-legend-row > span { flex-shrink: 0; margin-top: 2px; }
+.vuln-legend-row strong { color: var(--text); }
+.vuln-legend-note {
+  border-top: 1px solid var(--border); padding-top: 12px;
+  font-size: 0.78125rem; color: var(--text-dimmer);
+}
+.epss-key {
+  font-family: var(--mono); font-weight: 700; font-size: 0.75rem;
+  padding: 1px 5px; border-radius: 4px;
+}
+.epss-key.epss-high { color: var(--crit); background: color-mix(in oklch, var(--crit) 12%, transparent); }
+.epss-key.epss-mid  { color: var(--med);  background: color-mix(in oklch, var(--med) 12%, transparent); }
+.epss-key.epss-low  { color: var(--text-dimmer); background: var(--bg); }
+
+.filter-btn-info { padding: 7px 11px; font-size: 0.875rem; line-height: 1; }
+
+/* Deliberately not a severity-palette chip: KEV means "attackers are using this today", which
+   outranks any CVSS band, so it reads as a filled alarm rather than another outlined badge. */
+.kev-pill {
+  display: inline-flex; align-items: center; gap: 4px; margin-left: 6px;
+  background: var(--crit); color: var(--on-crit);
+  font-size: 0.625rem; font-weight: 800; letter-spacing: 0.08em;
+  padding: 3px 8px; border-radius: 4px; vertical-align: middle;
+  font-family: var(--sans); white-space: nowrap;
 }
 .vuln-desc { font-size: 0.8125rem; color: var(--text-dim); line-height: 1.65; margin-bottom: 12px; }
 .vuln-meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

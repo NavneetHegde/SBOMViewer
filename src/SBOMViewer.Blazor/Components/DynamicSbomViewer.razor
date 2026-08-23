@@ -12,9 +12,15 @@
     <div style="position:fixed; top:0; left:0; right:0; bottom:0; background:oklch(11% 0.018 240 / 0.85); display:flex; flex-direction:column; justify-content:center; align-items:center; gap:16px; z-index:1000;">
         <div class="spinner" style="width:40px; height:40px; border-width:3px;"></div>
         <div class="scan-running" style="padding:14px 24px; font-size:14px;">
-            Scanning @ChatState.ScanProgress / @ChatState.ScanTotal packages against OSV.dev…
+            @(ChatState.ScanPhase
+              ?? $"Scanning {ChatState.ScanProgress} / {ChatState.ScanTotal} packages against OSV.dev…")
         </div>
-        <p style="font-size:12px; color:var(--text-dimmer);">All processing happens in your browser. No data leaves your machine.</p>
+        @* This is displayed *while* package coordinates are in flight to OSV.dev, so it has to say
+           so. The defensible claim is that the document is never uploaded — not that nothing is
+           sent. See PRIVACY.md. *@
+        <p style="font-size:12px; color:var(--text-dimmer);">
+            Your SBOM file is never uploaded — only package names and versions are sent, to OSV.dev.
+        </p>
     </div>
 }
 
@@ -274,8 +280,12 @@
     private bool    _compSortAsc   = true;
 
     // Vuln tab state
-    private string  _vulnSearch    = "";
-    private string? _vulnSevFilter = null;
+    private string  _vulnSearch     = "";
+    private string? _vulnSevFilter  = null;
+    private string  _vulnSortCol    = "cvss";   // cvss | epss | name
+    private bool    _vulnKevOnly    = false;
+    private bool    _vulnHasFixOnly = false;
+    private bool    _vulnLegendOpen = false;
     private HashSet<string> _expandedVulns = [];
 
     // Compliance tab state
@@ -414,6 +424,9 @@
 
         ChatState.IsScanning = true;
         ChatState.ScanError  = null;
+        // Warnings describe the scan that produced them, so a re-scan starts from a clean slate.
+        // Otherwise a repeatedly-failing enrichment stacks the same two banners on every attempt.
+        ChatState.ScanWarnings.Clear();
         _activeTab           = "vulns";
         ChatState.NotifyStateChanged();
 
@@ -440,6 +453,12 @@
                 {
                     ChatState.ScanWarnings.Add(msg);
                     ChatState.NotifyStateChanged();
+                },
+                onPhase: phase =>
+                {
+                    ChatState.ScanPhase = phase;
+                    ChatState.NotifyStateChanged();
+                    InvokeAsync(StateHasChanged);
                 });
 
             ChatState.VulnResults = results;
@@ -796,9 +815,12 @@
             return @<div class="content fadein" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:16px;">
                 <div class="scan-running" style="padding:16px 24px; font-size:14px;">
                     <div class="spinner" style="width:20px; height:20px; border-width:3px;"></div>
-                    Scanning @ChatState.ScanProgress / @ChatState.ScanTotal packages against OSV.dev…
+                    @(ChatState.ScanPhase
+                      ?? $"Scanning {ChatState.ScanProgress} / {ChatState.ScanTotal} packages against OSV.dev…")
                 </div>
-                <p style="font-size:12px; color:var(--text-dimmer);">All processing happens in your browser.</p>
+                <p style="font-size:12px; color:var(--text-dimmer);">
+                    Your SBOM file is never uploaded — only package names and versions are sent.
+                </p>
             </div>;
         }
 
@@ -812,15 +834,19 @@
                     <button class="btn-primary" style="font-size:13px; padding:8px 20px;" @onclick="ScanVulnerabilities">
                         Scan for Vulnerabilities
                     </button>
-                    <div style="margin-top:8px; font-size:11px; color:var(--text-dimmer);">Up to 500 packages · All client-side · No data leaves your browser</div>
+                    @* States what the scan will do before the user starts it, not after. *@
+                    <div style="margin-top:8px; font-size:11px; color:var(--text-dimmer);">
+                        Up to 500 packages · Your file is never uploaded · Package names and versions go to OSV.dev
+                    </div>
                 </div>
             </div>;
         }
 
         var vulns = ChatState.VulnResults?
             .SelectMany(r => r.Vulnerabilities.Select(v => (r.PackageName, r.PackageVersion, v)))
-            .OrderByDescending(x => x.v.CvssScore ?? 0)
             .ToList() ?? [];
+
+        var kevCount = vulns.Count(x => x.v.IsKnownExploited);
 
         var q = _vulnSearch.ToLowerInvariant();
         if (!string.IsNullOrEmpty(q))
@@ -828,6 +854,18 @@
                                      x.PackageName.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
         if (_vulnSevFilter is not null)
             vulns = vulns.Where(x => x.v.Severity == _vulnSevFilter).ToList();
+        if (_vulnKevOnly)
+            vulns = vulns.Where(x => x.v.IsKnownExploited).ToList();
+        if (_vulnHasFixOnly)
+            vulns = vulns.Where(x => x.v.FixedVersion is not null).ToList();
+
+        vulns = _vulnSortCol switch
+        {
+            // Unscored CVEs sort last rather than as zero — "not scored" is not "harmless".
+            "epss" => vulns.OrderByDescending(x => x.v.EpssScore ?? -1).ToList(),
+            "name" => vulns.OrderBy(x => x.PackageName, StringComparer.OrdinalIgnoreCase).ToList(),
+            _      => vulns.OrderByDescending(x => x.v.CvssScore ?? 0).ToList(),
+        };
 
         return @<div style="display:flex; flex-direction:column; height:100%; overflow:hidden;" class="fadein">
             <div class="toolbar">
@@ -844,13 +882,70 @@
                         @s
                     </button>
                 }
+                @* Rendered even at zero. Hiding it would strand the filter in the on state after a
+                   re-scan where KEV enrichment failed — the list would filter to empty with no
+                   control left to switch it back off. *@
+                <button class="filter-btn filter-btn-kev @(_vulnKevOnly ? "active" : "")"
+                        disabled="@(kevCount == 0 && !_vulnKevOnly)"
+                        title="@(kevCount > 0
+                                 ? "Show only vulnerabilities CISA has confirmed as exploited in the wild"
+                                 : "No known-exploited vulnerabilities in these results")"
+                        @onclick="() => _vulnKevOnly = !_vulnKevOnly">
+                    ⚡ Exploited (@kevCount)
+                </button>
+                <button class="filter-btn @(_vulnHasFixOnly ? "active" : "")"
+                        title="Show only vulnerabilities with a known fix version"
+                        @onclick="() => _vulnHasFixOnly = !_vulnHasFixOnly">
+                    Has fix
+                </button>
+                <button class="filter-btn filter-btn-info @(_vulnLegendOpen ? "active" : "")"
+                        title="What do EPSS and KEV mean?"
+                        @onclick="() => _vulnLegendOpen = !_vulnLegendOpen">
+                    ⓘ
+                </button>
                 <div class="toolbar-right">
                     <span class="count-label">@vulns.Count vulnerabilities</span>
+                    <select class="sort-select" title="Sort by"
+                            value="@_vulnSortCol" @onchange="OnVulnSortChanged">
+                        <option value="cvss">Sort: CVSS</option>
+                        <option value="epss">Sort: EPSS</option>
+                        <option value="name">Sort: Package</option>
+                    </select>
                     <button class="btn-primary" @onclick="ScanVulnerabilities" disabled="@ChatState.IsScanning">
                         ↻ Re-scan
                     </button>
                 </div>
             </div>
+
+            @if (_vulnLegendOpen)
+            {
+                <div class="vuln-legend">
+                    <div class="vuln-legend-row">
+                        <span class="kev-pill">⚡ EXPLOITED</span>
+                        <div>
+                            <strong>CISA KEV</strong> — this vulnerability is on CISA's Known Exploited
+                            Vulnerabilities catalogue, meaning attacks using it have been observed in the
+                            wild. Treat it as urgent regardless of its CVSS score.
+                        </div>
+                    </div>
+                    <div class="vuln-legend-row">
+                        <span class="vuln-epss epss-high">72% <span class="vuln-epss-label">EPSS</span></span>
+                        <div>
+                            <strong>EPSS</strong> — the Exploit Prediction Scoring System estimates the
+                            probability that a vulnerability will be exploited in the next 30 days.
+                            <span class="epss-key epss-high">10%+</span> is the usual act-on-it threshold,
+                            <span class="epss-key epss-mid">1–10%</span> is elevated, and
+                            <span class="epss-key epss-low">under 1%</span> is unlikely. Blank means the
+                            CVE has not been scored — which is not the same as scoring zero.
+                        </div>
+                    </div>
+                    <div class="vuln-legend-note">
+                        The severity badge measures how bad exploitation would be. EPSS and KEV measure
+                        how likely it is. A Critical nobody is exploiting is often less urgent than a
+                        High that attackers are using today.
+                    </div>
+                </div>
+            }
 
             @if (ChatState.ScanError is not null)
             {
@@ -885,13 +980,29 @@
                                 <div class="vuln-card-header">
                                     <div>
                                         @SevBadge(vuln.Severity ?? "NONE")
+                                        @if (vuln.IsKnownExploited)
+                                        {
+                                            <span class="kev-pill" title="CISA Known Exploited Vulnerability — confirmed exploited in the wild">⚡ EXPLOITED</span>
+                                        }
                                         <div class="vuln-id">@vid</div>
-                                        <div class="vuln-pkg">@pkgName@@pkgVer</div>
+                                        @* "@@" is a literal @ and puts Razor back into HTML mode, so
+                                           the version has to be its own expression or it renders as
+                                           the literal text "pkgVer". *@
+                                        <div class="vuln-pkg">@pkgName@("@")@pkgVer</div>
                                     </div>
-                                    @if (vuln.CvssScore.HasValue)
-                                    {
-                                        <div class="vuln-score" style="color:@scoreCol">@vuln.CvssScore.Value.ToString("F1")</div>
-                                    }
+                                    <div class="vuln-scores">
+                                        @if (vuln.EpssScore.HasValue)
+                                        {
+                                            <div class="vuln-epss @EpssBand(vuln.EpssScore.Value)"
+                                                 title="EPSS — estimated probability this is exploited in the next 30 days">
+                                                @EpssDisplay(vuln.EpssScore.Value) <span class="vuln-epss-label">EPSS</span>
+                                            </div>
+                                        }
+                                        @if (vuln.CvssScore.HasValue)
+                                        {
+                                            <div class="vuln-score" style="color:@scoreCol">@vuln.CvssScore.Value.ToString("F1")</div>
+                                        }
+                                    </div>
                                 </div>
                                 @if (isExpand)
                                 {
@@ -913,6 +1024,25 @@
                                                 <div class="vuln-meta-label">Severity</div>
                                                 <div class="vuln-meta-val">@(vuln.Severity ?? "Unknown")@(vuln.CvssScore.HasValue ? $" ({vuln.CvssScore:F1})" : "")</div>
                                             </div>
+                                            @if (vuln.EpssScore.HasValue)
+                                            {
+                                                <div>
+                                                    <div class="vuln-meta-label">Exploit probability (EPSS)</div>
+                                                    <div class="vuln-meta-val">@EpssDisplay(vuln.EpssScore.Value) in the next 30 days</div>
+                                                </div>
+                                            }
+                                            @if (vuln.IsKnownExploited)
+                                            {
+                                                <div>
+                                                    <div class="vuln-meta-label">CISA KEV</div>
+                                                    <div class="vuln-meta-val">
+                                                        <a class="vuln-link" target="_blank"
+                                                           href="https://www.cisa.gov/known-exploited-vulnerabilities-catalog">
+                                                            Confirmed exploited in the wild ↗
+                                                        </a>
+                                                    </div>
+                                                </div>
+                                            }
                                         </div>
                                         @if (vuln.FixedVersion is not null)
                                         {
@@ -942,6 +1072,32 @@
     {
         if (!_expandedVulns.Remove(key)) _expandedVulns.Add(key);
     }
+
+    private void OnVulnSortChanged(ChangeEventArgs e) =>
+        _vulnSortCol = e.Value?.ToString() ?? "cvss";
+
+    /// <summary>
+    /// EPSS as a percentage. Scores below 1% round to "&lt;1%" rather than "0%" — the difference
+    /// between a scored-but-unlikely CVE and an unscored one matters, and unscored renders nothing.
+    /// </summary>
+    private static string EpssDisplay(double score) => score switch
+    {
+        >= 0.995 => "100%",
+        >  0     and < 0.01 => "<1%",
+        _        => (score * 100).ToString("F0") + "%"
+    };
+
+    /// <summary>
+    /// EPSS is heavily skewed — the large majority of CVEs score under 1% — so a linear colour ramp
+    /// would leave almost everything looking identical. These are the bands FIRST uses when
+    /// describing the score operationally: 10%+ is the usual "act on this" threshold.
+    /// </summary>
+    private static string EpssBand(double score) => score switch
+    {
+        >= 0.10 => "epss-high",
+        >= 0.01 => "epss-mid",
+        _       => "epss-low"
+    };
 
     private static RenderFragment SevBadge(string? sev)
     {

@@ -62,10 +62,24 @@
         <span class="footer-sep">|</span>
         <span>SBOM Viewer v@(AppVersion)</span>
         <span class="footer-sep">|</span>
-        <FluentAnchor Href="@($"sbomviewer_{AppVersion}.json")" Download="@($"sbomviewer_{AppVersion}.json")" Appearance="Appearance.Hypertext"
-                      Class="no-icon-margin" Style="font-size:0.85rem;">
+        @* All three are plain anchors on one class. FluentAnchor was themed by Fluent UI rather
+           than the app's own tokens, so it did not follow the light/dark switch with its
+           neighbours. *@
+        <a class="footer-link" href="@($"sbomviewer_{AppVersion}.json")"
+           download="@($"sbomviewer_{AppVersion}.json")"
+           title="Download this app's own SBOM">
             Download SBOM
-        </FluentAnchor>
+        </a>
+        <span class="footer-sep">|</span>
+        <a class="footer-link" href="@FeedbackUrl" target="_blank" rel="noopener noreferrer"
+           title="Opens a pre-filled GitHub issue — you review it before submitting">
+            Feedback
+        </a>
+        <span class="footer-sep">|</span>
+        <a class="footer-link" href="@PrivacyUrl" target="_blank" rel="noopener noreferrer"
+           title="What is sent, to whom, and what stays on your machine">
+            Privacy
+        </a>
     </footer>
 </div>
 
@@ -83,12 +97,36 @@
             ?.InformationalVersion.Split('+')[0]
         ?? "unknown";
 
+    private string? _userAgent;
+
+    /// <summary>
+    /// PRIVACY.md is served from the repository rather than rendered in-app — the app has no
+    /// markdown renderer, and duplicating the text into a page would guarantee the two drift.
+    /// </summary>
+    private const string PrivacyUrl =
+        "https://github.com/NavneetHegde/SBOMViewer/blob/main/PRIVACY.md";
+
+    /// <summary>
+    /// Recomputed per render so the SBOM format reflects whatever is open. The user agent only
+    /// enriches the prefill — the link is complete and usable before that interop call returns.
+    /// </summary>
+    private string FeedbackUrl => FeedbackLink.Build(
+        AppVersion,
+        SbomState.DetectedFormat is null ? null : SbomFormatLabel.For(SbomState.DetectedFormat),
+        _userAgent);
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             _theme = await JS.InvokeAsync<string>("sbomGetTheme");
             _fontScale = await JS.InvokeAsync<double>("sbomGetFontScale");
+
+            // Best-effort: a missing user agent just drops one line from the issue prefill, so a
+            // failure here must never surface to the user or block the render.
+            try { _userAgent = await JS.InvokeAsync<string>("sbomUserAgent"); }
+            catch (Exception) { /* leave null */ }
+
             StateHasChanged();
         }
     }

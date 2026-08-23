@@ -19,6 +19,14 @@ public class ChatState
     public bool IsScanning { get; set; }
     public int ScanProgress { get; set; }
     public int ScanTotal { get; set; }
+
+    /// <summary>
+    /// What the scan is currently doing, when it is no longer counting packages. Enrichment runs
+    /// after the last OSV fetch, so without this the overlay would sit at 100% for several seconds
+    /// while the KEV catalogue downloads and look hung.
+    /// </summary>
+    public string? ScanPhase { get; set; }
+
     public string? ScanError { get; set; }
     public List<string> ScanWarnings { get; } = [];
 
@@ -44,6 +52,7 @@ public class ChatState
         IsScanning = false;
         ScanProgress = 0;
         ScanTotal = 0;
+        ScanPhase = null;
         ScanError = null;
         ScanWarnings.Clear();
         NotifyStateChanged();
@@ -61,6 +70,7 @@ public class ChatState
         IsScanning = false;
         ScanProgress = 0;
         ScanTotal = 0;
+        ScanPhase = null;
         ScanError = null;
         ScanWarnings.Clear();
         NotifyStateChanged();

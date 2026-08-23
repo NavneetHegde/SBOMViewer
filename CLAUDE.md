@@ -63,9 +63,7 @@ SBOMViewer.slnx
 │       │   ├── CompareSlot.razor       # One baseline/current dropzone slot used by Compare.razor
 │       │   ├── DynamicSbomViewer.razor # Top-level viewer — FluentCard + FluentAccordion sections + vuln scan
 │       │   ├── DynamicSection.razor    # Array/object renderer — search, scroll, details/summary
-│       │   ├── DynamicObject.razor     # Recursive object renderer — key-value, badges, nested
-│       │   ├── VulnerabilitySummary.razor  # Severity breakdown, searchable affected-package list
-│       │   └── VulnerabilityBadge.razor    # Colored severity badge (Critical/High/Medium/Low)
+│       │   └── DynamicObject.razor     # Recursive object renderer — key-value, badges, nested
 │       ├── Services/
 │       │   ├── SbomState.cs            # Singleton state: JsonDocument, SchemaNode, format, filename
 │       │   ├── SbomLoader.cs           # Shared detect → validate → build-schema pipeline (+ saves recents)
@@ -144,7 +142,7 @@ The app version lives in `Directory.Build.props` at the repo root and is inherit
 5. **SchemaService.BuildFromJson** — builds a `SchemaNode` tree from the JSON structure, applies render hints
 6. **SbomState** — singleton holding `JsonDocument`, `SchemaNode`, detected format, and filename; notifies subscribers via `OnChange`
 7. **DynamicSbomViewer** → **DynamicSection** → **DynamicObject** — recursive components that walk `JsonElement` + `SchemaNode` to render Fluent UI
-8. **Vulnerability scan** (user-initiated) — **PackageExtractor** extracts packages → **VulnerabilityService** queries OSV.dev in two phases (batch to collect IDs, then per-vuln detail fetch) → **ChatState** stores results → **VulnerabilitySummary** renders severity breakdown and affected packages
+8. **Vulnerability scan** (user-initiated) — **PackageExtractor** extracts packages → **VulnerabilityService** queries OSV.dev (batch to collect IDs, then per-vuln detail fetch), then enriches with EPSS + CISA KEV → **ChatState** stores results → `RenderVulnsTab` in **DynamicSbomViewer** renders the sortable, filterable list
 
 ### Dynamic Rendering Pipeline
 
@@ -159,15 +157,25 @@ The UI is generated dynamically from the uploaded JSON — no static C# model cl
 User-initiated vulnerability scanning via the [OSV.dev](https://osv.dev) API — all processing is client-side:
 
 - **PackageExtractor** — extracts `PackageInfo` (name, version, ecosystem, purl) from the SBOM JSON. CycloneDX uses the `components` array + purl; SPDX 2.x uses the `packages` array + `externalRefs`; SPDX 3.0 uses the `@graph` array, filtering `software_Package` elements
-- **VulnerabilityService** — two-phase scan:
+- **VulnerabilityService** — three-phase scan:
   - **Phase 1**: batches packages in groups of 100, POSTs to `https://api.osv.dev/v1/querybatch` to collect vuln IDs per package
-  - **Phase 2**: fetches full details for each unique vuln ID via `GET https://api.osv.dev/v1/vulns/{id}` (up to 5 concurrent requests), parses complete severity, CVSS score, summary, and fix version
+  - **Phase 2**: fetches full details for each unique vuln ID via `GET https://api.osv.dev/v1/vulns/{id}` (up to 5 concurrent requests), parses complete severity, CVSS score, summary, fix version, and the `CVE-*` entries from `aliases`
+  - **Phase 3**: exploitability enrichment — see [Exploitability enrichment](#exploitability-enrichment-epss--cisa-kev)
   - Hard caps prevent abuse: max **500 packages** scanned, max **200 unique vuln detail fetches** per scan. Exceeding either cap fires `onWarning` and surfaces a warning banner in the UI
   - Severity is resolved in priority order: `database_specific.severity` → `database_specific.cvss.score` → `ecosystem_specific.severity` → `severity[].score`. `"MODERATE"` (GitHub Advisory DB) is normalised to `"MEDIUM"`
 - **ChatState** — singleton holding scan results, progress, warnings, and error state. `ClearVulnerabilities()` is called on new file upload to reset stale data. `ScanWarnings` accumulates non-fatal cap/truncation notices
-- **DynamicSbomViewer** — Vulnerabilities accordion section with "Scan for Vulnerabilities" button, progress overlay (tracks vuln detail fetches), count badge, warning banners, and hover info popover
-- **VulnerabilitySummary** — top-level severity breakdown badges, searchable list of affected packages with per-severity badge breakdown per package (not a single combined badge), expandable CVE details with links to OSV.dev
-- **VulnerabilityBadge** — colored severity badge; MEDIUM uses dark text (`#1a1a1a`) on amber background for legibility
+- **DynamicSbomViewer** — Vulnerabilities accordion section with "Scan for Vulnerabilities" button, progress overlay (tracks vuln detail fetches), count badge, warning banners, and hover info popover. `RenderVulnsTab` is the live vulnerability list: search, severity filters, KEV-only and has-fix toggles, and a sort control (CVSS / EPSS / package name)
+
+### Exploitability enrichment (EPSS + CISA KEV)
+
+CVSS measures potential impact, not likelihood. Phase 3 adds two free public datasets so the list can be triaged by what is actually being exploited. Both are fetched **client-side**, like everything else.
+
+- **Join key is the CVE ID.** OSV IDs are frequently `GHSA-*` / `PYSEC-*` / `GO-*`, so `ParseVulnerability` retains the `CVE-*` entries from the OSV record's `aliases` array. A vuln with no CVE alias is simply not enrichable and is skipped
+- **EPSS** — `GET https://api.first.org/data/v1/epss?cve=…`, batched at 100 CVEs per request. The `epss` field is a **string**, parsed with `InvariantCulture`. `EpssScore` is `double?` — null (not scored) is deliberately distinct from `0.0` (scored, negligible)
+- **KEV** — fetched from **`raw.githubusercontent.com/cisagov/kev-data`, not `cisa.gov`**. The canonical CISA feed returns no `Access-Control-Allow-Origin` header, so a browser fetch is blocked; the GitHub mirror is the same first-party `cisagov` org and sends `ACAO: *`. Cached in a field for the lifetime of the service, so a re-scan does not refetch it
+- **Enrichment is strictly non-fatal and independently wrapped.** EPSS and KEV each have their own try/catch, so one failing does not cost the other, and neither can fail the scan. A failure leaves results unenriched and adds a `ScanWarnings` note — the OSV results still render
+
+Enrichment is applied to the phase-2 `vulnDetails` dictionary *before* it is projected back onto packages, so each vuln is enriched once and the result fans out to every affected package.
 
 ### SBOM Diff (`/compare`)
 
