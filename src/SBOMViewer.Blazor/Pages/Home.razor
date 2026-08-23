@@ -62,19 +62,21 @@
         <span class="footer-sep">|</span>
         <span>SBOM Viewer v@(AppVersion)</span>
         <span class="footer-sep">|</span>
-        <FluentAnchor Href="@($"sbomviewer_{AppVersion}.json")" Download="@($"sbomviewer_{AppVersion}.json")" Appearance="Appearance.Hypertext"
-                      Class="no-icon-margin" Style="font-size:0.85rem;">
+        @* All three are plain anchors on one class. FluentAnchor was themed by Fluent UI rather
+           than the app's own tokens, so it did not follow the light/dark switch with its
+           neighbours. *@
+        <a class="footer-link" href="@($"sbomviewer_{AppVersion}.json")"
+           download="@($"sbomviewer_{AppVersion}.json")"
+           title="Download this app's own SBOM">
             Download SBOM
-        </FluentAnchor>
+        </a>
         <span class="footer-sep">|</span>
-        @* Plain anchor rather than a JS-interop click: it works the moment the footer paints,
-           without waiting on the user-agent lookup, which only enriches the prefill. *@
-        <a class="footer-feedback" href="@FeedbackUrl" target="_blank" rel="noopener noreferrer"
+        <a class="footer-link" href="@FeedbackUrl" target="_blank" rel="noopener noreferrer"
            title="Opens a pre-filled GitHub issue — you review it before submitting">
             Feedback
         </a>
         <span class="footer-sep">|</span>
-        <a class="footer-feedback" href="@PrivacyUrl" target="_blank" rel="noopener noreferrer"
+        <a class="footer-link" href="@PrivacyUrl" target="_blank" rel="noopener noreferrer"
            title="What is sent, to whom, and what stays on your machine">
             Privacy
         </a>

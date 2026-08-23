@@ -186,20 +186,16 @@ body {
 .app-footer .footer-sep {
   margin: 0 10px; color: var(--border);
 }
-.app-footer .footer-download {
+/* One treatment for every footer link, so they stay identical as more are added. Replaces the
+   old .footer-download rules, which nothing referenced after the markup moved to FluentAnchor. */
+.app-footer .footer-link {
   background: none; border: none; padding: 0; cursor: pointer;
   color: var(--accent); font-family: var(--mono); font-size: 0.75rem;
   text-decoration: underline; text-underline-offset: 2px;
   transition: opacity 0.15s;
 }
-.app-footer .footer-download:hover { opacity: 0.75; }
-.app-footer .footer-download:disabled { color: var(--text-dimmer); text-decoration: none; cursor: default; opacity: 1; }
-.app-footer .footer-feedback {
-  color: var(--accent); font-family: var(--mono); font-size: 0.75rem;
-  text-decoration: underline; text-underline-offset: 2px;
-  transition: opacity 0.15s;
-}
-.app-footer .footer-feedback:hover { opacity: 0.75; }
+.app-footer .footer-link:hover { opacity: 0.75; }
+.app-footer .footer-link:disabled { color: var(--text-dimmer); text-decoration: none; cursor: default; opacity: 1; }
 
 .btn-primary {
   background: var(--accent); border: none; color: #fff;
