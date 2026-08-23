@@ -7,8 +7,8 @@ The app today does one thing well: upload a single SBOM, browse it via a dynamic
 | # | Feature | Gap it closes | Plan | Status |
 |---|---------|---------------|------|--------|
 | 1 | SBOM Diff | No way to compare two SBOMs — the question users have at every release | [sbom-diff-plan.md](sbom-diff-plan.md) | **Implemented** (phase 1) |
-| 2 | Data Exports | Only export path is browser print-to-PDF, though every tab holds clean structured data | [data-export-plan.md](data-export-plan.md) | Not started |
-| 3 | Vulnerability Triage | Scan results are an undifferentiated list — no exploitability signal, no sort or filter | [vulnerability-triage-plan.md](vulnerability-triage-plan.md) | Not started |
+| 2 | Data Exports | Nothing the app *derives* — license risk, scan results, the diff — can leave the browser in machine-readable form | [data-export-plan.md](data-export-plan.md) · [tasks](data-export-tasks.md) | Not started |
+| 3 | Vulnerability Triage | Severity says what *could* be bad; nothing says what is actually being exploited | [vulnerability-triage-plan.md](vulnerability-triage-plan.md) | Not started |
 
 Feature 1's phase 2 — surfacing **newly introduced CVEs** between the two documents — is not yet built. See the plan for the API-cap consideration it raises.
 
