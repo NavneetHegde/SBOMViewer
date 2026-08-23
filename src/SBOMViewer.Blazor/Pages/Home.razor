@@ -2,6 +2,9 @@
 @implements IDisposable
 @inject SbomState SbomState
 @inject ChatState ChatState
+@inject SbomCompareState CompareState
+@inject SbomLoader SbomLoader
+@inject NavigationManager Nav
 @inject IJSRuntime JS
 @using System.Reflection
 @using SBOMViewer.Blazor.Models
@@ -28,7 +31,17 @@
 
             @if (SbomState.Document is not null)
             {
-                <button class="btn-primary" @onclick="NewFile">← New file</button>
+                <button class="btn-ghost nav-action" title="Export Report" @onclick="ExportReport">
+                    ⤓ <span class="nav-action-label">Export Report</span>
+                </button>
+                <button class="btn-ghost nav-action btn-compare"
+                        title="Compare — use this file as the baseline and pick a second SBOM"
+                        @onclick="CompareWithAnother">
+                    ⇄ <span class="nav-action-label">Compare</span>
+                </button>
+                <button class="btn-primary nav-action" title="New file" @onclick="NewFile">
+                    ← <span class="nav-action-label">New file</span>
+                </button>
             }
         </div>
     </nav>
@@ -102,6 +115,41 @@
     {
         SbomState.Clear();
         ChatState.ClearVulnerabilities();
+    }
+
+    private async Task ExportReport() => await JS.InvokeVoidAsync("sbomPrintReport");
+
+    /// <summary>
+    /// Seeds the comparison with the currently open file as the baseline, then sends the user to
+    /// /compare to pick the second document.
+    ///
+    /// The JSON is re-parsed rather than handing SbomState's JsonDocument to SbomCompareState:
+    /// both own and dispose their documents, so sharing one instance would leave the compare page
+    /// holding a disposed document as soon as the viewer is cleared.
+    /// </summary>
+    private void CompareWithAnother()
+    {
+        if (SbomState.Document is null) return;
+
+        // If the open file is already one side of an in-progress comparison, go back to it rather
+        // than resetting — otherwise opening a file from /compare and returning would discard it.
+        if (CompareState.HasBaseline &&
+            (CompareState.BaselineFileName == SbomState.FileName ||
+             CompareState.CurrentFileName  == SbomState.FileName))
+        {
+            Nav.NavigateTo("compare");
+            return;
+        }
+
+        var result = SbomLoader.Load(
+            SbomState.Document.RootElement.GetRawText(),
+            SbomState.FileName ?? "baseline.json");
+
+        if (!result.Success) return;
+
+        CompareState.Clear();
+        CompareState.SetBaseline(result);
+        Nav.NavigateTo("compare");
     }
 
     private async Task DownloadSbom()

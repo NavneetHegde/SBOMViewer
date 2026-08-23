@@ -1,0 +1,287 @@
+@page "/compare"
+@implements IDisposable
+@inject SbomCompareState CompareState
+@inject SbomState SbomState
+@inject SbomLoader SbomLoader
+@inject ChatState ChatState
+@inject RecentSbomStore RecentStore
+@inject NavigationManager Nav
+@using SBOMViewer.Blazor.Models
+
+<PageTitle>Compare SBOMs — SBOM Viewer</PageTitle>
+
+<div class="app">
+    <nav class="nav">
+        <div class="nav-logo">
+            <div class="nav-logo-icon"><img src="icon-192.png" /></div>
+            SBOM Viewer
+        </div>
+        <div class="nav-center">
+            <span class="nav-badge">Compare</span>
+        </div>
+        <div class="nav-actions">
+            @if (CompareState.HasBaseline || CompareState.HasCurrent)
+            {
+                <button class="btn-ghost" @onclick="ClearAll">Reset</button>
+            }
+            <button class="btn-primary" @onclick='() => Nav.NavigateTo("/")'>← Viewer</button>
+        </div>
+    </nav>
+
+    <div class="content">
+        <div class="compare-slots">
+            <CompareSlot Label="Baseline (older)"
+                         Placeholder="Previous SBOM"
+                         Icon="📄"
+                         FileName="@CompareState.BaselineFileName"
+                         FormatLabel="@FormatDisplay(CompareState.BaselineFormat)"
+                         ComponentCount="@CompareState.BaselineComponentCount"
+                         Awaiting="@(CompareState.HasCurrent && !CompareState.HasBaseline)"
+                         OnLoaded="OnBaselineLoaded"
+                         OnCleared="@(() => CompareState.ClearBaseline())"
+                         OnOpenInViewer="@(() => OpenInViewer(CompareState.BaselineDocument, CompareState.BaselineFileName))"
+                         Recent="@_recent" />
+
+            @if (CompareState.HasBaseline || CompareState.HasCurrent)
+            {
+                <button class="compare-arrow compare-swap"
+                        title="Swap — make the other file the baseline"
+                        @onclick="@(() => CompareState.Swap())">⇄</button>
+            }
+            else
+            {
+                <div class="compare-arrow">→</div>
+            }
+
+            <CompareSlot Label="Current (newer)"
+                         Placeholder="New SBOM"
+                         Icon="📄"
+                         FileName="@CompareState.CurrentFileName"
+                         FormatLabel="@FormatDisplay(CompareState.CurrentFormat)"
+                         ComponentCount="@CompareState.CurrentComponentCount"
+                         Awaiting="@(CompareState.HasBaseline && !CompareState.HasCurrent)"
+                         OnLoaded="OnCurrentLoaded"
+                         OnCleared="@(() => CompareState.ClearCurrent())"
+                         OnOpenInViewer="@(() => OpenInViewer(CompareState.CurrentDocument, CompareState.CurrentFileName))"
+                         Recent="@_recent" />
+        </div>
+
+        @if (CompareState.Diff is null)
+        {
+            <div class="compare-hint">
+                @if (CompareState.HasBaseline && !CompareState.HasCurrent)
+                {
+                    <p><strong>@CompareState.BaselineFileName</strong> is set as the baseline.</p>
+                    <p class="compare-hint-sub">Now choose the newer SBOM to compare it against.</p>
+                }
+                else if (CompareState.HasCurrent && !CompareState.HasBaseline)
+                {
+                    <p><strong>@CompareState.CurrentFileName</strong> is set as the current file.</p>
+                    <p class="compare-hint-sub">Now choose the older SBOM to compare it against.</p>
+                }
+                else
+                {
+                    <p>Upload two SBOMs to see what changed between them.</p>
+                    <p class="compare-hint-sub">
+                        Both files stay on this machine — nothing is sent to a server. The two most
+                        recent files are kept in this browser so you can reopen them later; clear them
+                        any time from the home screen. The two documents may be in different formats.
+                    </p>
+                }
+            </div>
+        }
+        else
+        {
+            var diff = CompareState.Diff;
+
+            @if (diff.IsIdentical)
+            {
+                <div class="compare-hint">
+                    <p>No component-level differences.</p>
+                    <p class="compare-hint-sub">
+                        All @diff.UnchangedCount components match on version and license.
+                    </p>
+                </div>
+            }
+            else
+            {
+                <div class="stats-grid">
+                    <div class="stat-card clickable" @onclick='() => _tab = "added"'>
+                        <div class="stat-label">Added</div>
+                        <div class="stat-value" style="color:var(--low);">@diff.Added.Count</div>
+                        <div class="stat-sub">new components</div>
+                    </div>
+                    <div class="stat-card clickable" @onclick='() => _tab = "removed"'>
+                        <div class="stat-label">Removed</div>
+                        <div class="stat-value" style="color:var(--crit);">@diff.Removed.Count</div>
+                        <div class="stat-sub">no longer present</div>
+                    </div>
+                    <div class="stat-card clickable" @onclick='() => _tab = "version"'>
+                        <div class="stat-label">Version</div>
+                        <div class="stat-value" style="color:var(--accent);">@diff.VersionChanged.Count</div>
+                        <div class="stat-sub">version changed</div>
+                    </div>
+                    <div class="stat-card clickable" @onclick='() => _tab = "license"'>
+                        <div class="stat-label">License</div>
+                        <div class="stat-value" style="color:var(--med);">@diff.LicenseChanged.Count</div>
+                        <div class="stat-sub">license changed</div>
+                    </div>
+                </div>
+
+                <div class="tab-bar">
+                    <button class="tab @(_tab == "added"   ? "active" : "")" @onclick='() => _tab = "added"'>Added <span class="tbadge">@diff.Added.Count</span></button>
+                    <button class="tab @(_tab == "removed" ? "active" : "")" @onclick='() => _tab = "removed"'>Removed <span class="tbadge">@diff.Removed.Count</span></button>
+                    <button class="tab @(_tab == "version" ? "active" : "")" @onclick='() => _tab = "version"'>Version changed <span class="tbadge">@diff.VersionChanged.Count</span></button>
+                    <button class="tab @(_tab == "license" ? "active" : "")" @onclick='() => _tab = "license"'>License changed <span class="tbadge">@diff.LicenseChanged.Count</span></button>
+                </div>
+
+                <div class="toolbar">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input placeholder="Filter by name…" value="@_search" @oninput="OnSearchInput" />
+                    </div>
+                    <div class="toolbar-right">
+                        <span class="count-label">@Visible.Count of @Rows.Count</span>
+                    </div>
+                </div>
+
+                @if (Visible.Count == 0)
+                {
+                    <div class="compare-hint"><p>Nothing in this category.</p></div>
+                }
+                else
+                {
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Component</th>
+                                @if (_tab is "version")
+                                {
+                                    <th>From</th>
+                                    <th>To</th>
+                                }
+                                else if (_tab is "license")
+                                {
+                                    <th>From</th>
+                                    <th>To</th>
+                                    <th>Version</th>
+                                }
+                                else
+                                {
+                                    <th>Version</th>
+                                    <th>License</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var change in Visible)
+                            {
+                                var row = change.Current ?? change.Baseline!;
+                                <tr>
+                                    <td>
+                                        <div class="td-name">@change.Name</div>
+                                        @if (!string.IsNullOrEmpty(row.Purl))
+                                        {
+                                            <div class="td-purl" title="@row.Purl">@row.Purl</div>
+                                        }
+                                    </td>
+
+                                    @if (_tab is "version")
+                                    {
+                                        <td class="td-ver">@Display(change.Baseline?.Version)</td>
+                                        <td class="td-ver"><strong>@Display(change.Current?.Version)</strong></td>
+                                    }
+                                    else if (_tab is "license")
+                                    {
+                                        <td><span class="license-risk-badge @RiskClass(change.Baseline?.Risk)">@Display(change.Baseline?.License)</span></td>
+                                        <td><span class="license-risk-badge @RiskClass(change.Current?.Risk)">@Display(change.Current?.License)</span></td>
+                                        <td class="td-ver">@Display(row.Version)</td>
+                                    }
+                                    else
+                                    {
+                                        <td class="td-ver">@Display(row.Version)</td>
+                                        <td><span class="license-risk-badge @RiskClass(row.Risk)">@Display(row.License)</span></td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private string _tab = "added";
+    private string _search = "";
+
+    private IReadOnlyList<RecentSbom> _recent = [];
+
+    private void OnSearchInput(ChangeEventArgs e) => _search = e.Value?.ToString() ?? "";
+
+    private IReadOnlyList<ComponentChange> Rows => CompareState.Diff is null ? [] : _tab switch
+    {
+        "added"   => CompareState.Diff.Added,
+        "removed" => CompareState.Diff.Removed,
+        "version" => CompareState.Diff.VersionChanged,
+        "license" => CompareState.Diff.LicenseChanged,
+        _         => []
+    };
+
+    private List<ComponentChange> Visible => string.IsNullOrWhiteSpace(_search)
+        ? Rows.ToList()
+        : Rows.Where(c => c.Name.Contains(_search, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    private void OnBaselineLoaded(SbomLoadResult result) => CompareState.SetBaseline(result);
+    private void OnCurrentLoaded(SbomLoadResult result)  => CompareState.SetCurrent(result);
+
+    /// <summary>
+    /// Opens one of the two compared documents on its own in the single-file viewer, leaving the
+    /// comparison intact so the user can navigate back to it.
+    ///
+    /// Re-parsed rather than shared: SbomState and SbomCompareState each dispose the JsonDocument
+    /// they hold, so handing over the same instance would dispose it out from under the other.
+    /// </summary>
+    private void OpenInViewer(System.Text.Json.JsonDocument? document, string? fileName)
+    {
+        if (document is null) return;
+
+        var result = SbomLoader.Load(document.RootElement.GetRawText(), fileName ?? "sbom.json");
+        if (!result.Success) return;
+
+        ChatState.ClearVulnerabilities();
+        SbomState.Schema         = result.Schema;
+        SbomState.DetectedFormat = result.Format;
+        SbomState.FileName       = result.FileName;
+        SbomState.Document       = result.Document;
+
+        Nav.NavigateTo("");
+    }
+
+    private void ClearAll()
+    {
+        CompareState.Clear();
+        _search = "";
+        _tab = "added";
+    }
+
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+
+    private static string RiskClass(LicenseRisk? risk) => risk switch
+    {
+        LicenseRisk.Permissive     => "risk-permissive",
+        LicenseRisk.WeakCopyleft   => "risk-weak",
+        LicenseRisk.StrongCopyleft => "risk-strong",
+        LicenseRisk.Proprietary    => "risk-strong",
+        _                          => "risk-unknown"
+    };
+
+    private static string FormatDisplay(SbomFormat? format) => SbomFormatLabel.For(format);
+
+    protected override void OnInitialized() => CompareState.OnChange += StateHasChanged;
+
+    protected override async Task OnInitializedAsync() => _recent = await RecentStore.ListAsync();
+
+    public void Dispose() => CompareState.OnChange -= StateHasChanged;
+}
