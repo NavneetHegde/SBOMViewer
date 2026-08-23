@@ -73,6 +73,11 @@
            title="Opens a pre-filled GitHub issue — you review it before submitting">
             Feedback
         </a>
+        <span class="footer-sep">|</span>
+        <a class="footer-feedback" href="@PrivacyUrl" target="_blank" rel="noopener noreferrer"
+           title="What is sent, to whom, and what stays on your machine">
+            Privacy
+        </a>
     </footer>
 </div>
 
@@ -91,6 +96,13 @@
         ?? "unknown";
 
     private string? _userAgent;
+
+    /// <summary>
+    /// PRIVACY.md is served from the repository rather than rendered in-app — the app has no
+    /// markdown renderer, and duplicating the text into a page would guarantee the two drift.
+    /// </summary>
+    private const string PrivacyUrl =
+        "https://github.com/NavneetHegde/SBOMViewer/blob/main/PRIVACY.md";
 
     /// <summary>
     /// Recomputed per render so the SBOM format reflects whatever is open. The user agent only

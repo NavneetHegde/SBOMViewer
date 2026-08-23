@@ -15,7 +15,12 @@
             @(ChatState.ScanPhase
               ?? $"Scanning {ChatState.ScanProgress} / {ChatState.ScanTotal} packages against OSV.dev…")
         </div>
-        <p style="font-size:12px; color:var(--text-dimmer);">All processing happens in your browser. No data leaves your machine.</p>
+        @* This is displayed *while* package coordinates are in flight to OSV.dev, so it has to say
+           so. The defensible claim is that the document is never uploaded — not that nothing is
+           sent. See PRIVACY.md. *@
+        <p style="font-size:12px; color:var(--text-dimmer);">
+            Your SBOM file is never uploaded — only package names and versions are sent, to OSV.dev.
+        </p>
     </div>
 }
 
@@ -813,7 +818,9 @@
                     @(ChatState.ScanPhase
                       ?? $"Scanning {ChatState.ScanProgress} / {ChatState.ScanTotal} packages against OSV.dev…")
                 </div>
-                <p style="font-size:12px; color:var(--text-dimmer);">All processing happens in your browser.</p>
+                <p style="font-size:12px; color:var(--text-dimmer);">
+                    Your SBOM file is never uploaded — only package names and versions are sent.
+                </p>
             </div>;
         }
 
@@ -827,7 +834,10 @@
                     <button class="btn-primary" style="font-size:13px; padding:8px 20px;" @onclick="ScanVulnerabilities">
                         Scan for Vulnerabilities
                     </button>
-                    <div style="margin-top:8px; font-size:11px; color:var(--text-dimmer);">Up to 500 packages · All client-side · No data leaves your browser</div>
+                    @* States what the scan will do before the user starts it, not after. *@
+                    <div style="margin-top:8px; font-size:11px; color:var(--text-dimmer);">
+                        Up to 500 packages · Your file is never uploaded · Package names and versions go to OSV.dev
+                    </div>
                 </div>
             </div>;
         }
