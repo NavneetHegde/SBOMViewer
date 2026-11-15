@@ -6,6 +6,12 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
+  <!-- Test Explorer only: point the tests at the dev server (https://localhost:5157) via
+       local.runsettings. Deliberately not applied to "dotnet test" — CI and command-line runs
+       set BASE_URL themselves, and a run-settings value would override it. -->
+  <PropertyGroup Condition="'$(BuildingInsideVisualStudio)' == 'true'">
+    <RunSettingsFilePath>$(MSBuildProjectDirectory)\local.runsettings</RunSettingsFilePath>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="Microsoft.Playwright.NUnit" Version="1.49.0" />

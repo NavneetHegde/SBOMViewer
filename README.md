@@ -77,6 +77,10 @@ For the complete history of changes, see [CHANGELOG.md](./CHANGELOG.md).
 4. Navigate through accordion sections to explore components, dependencies, licenses, and more.
 5. Open the **Vulnerabilities** section and click **Scan for Vulnerabilities** to check all packages against the [OSV.dev](https://osv.dev) database — results show severity ratings, CVE IDs, and available fix versions.
 
+### Try It Without a File
+
+No SBOM to hand? **[Open the demo →](https://sbomviewer.com/?sample=1)** loads a sample straight into the dashboard — a fictional storefront built from real packages across Maven, npm, PyPI and NuGet, pinned to deliberately outdated versions so the vulnerability scan has something to find. The same sample is one click away on the landing page ("Try a sample").
+
 ### Sample Files
 
 The [`samples/`](./samples/) folder contains ready-to-use SBOM files for testing:

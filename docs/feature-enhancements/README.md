@@ -10,6 +10,14 @@ The app today does one thing well: upload a single SBOM, browse it via a dynamic
 | 2 | Data Exports | Nothing the app *derives* — license risk, scan results, the diff — can leave the browser in machine-readable form | [data-export-plan.md](data-export-plan.md) · [tasks](data-export-tasks.md) | Not started |
 | 3 | Vulnerability Triage | Severity says what *could* be bad; nothing says what is actually being exploited | [vulnerability-triage-plan.md](vulnerability-triage-plan.md) | **Implemented** |
 | 4 | User Feedback | No login, so no idea who uses the app or whether any of it lands | [user-feedback-plan.md](user-feedback-plan.md) | Not started |
+| 5 | Try a Sample | A visitor with no SBOM on disk never sees the dashboard | [01-try-a-sample.md](November26/01-try-a-sample.md) | Not started |
+| 6 | Quality Scorecard | Nothing says whether an SBOM is complete enough to hand over (NTIA / CISA minimum elements) | [02-quality-scorecard.md](November26/02-quality-scorecard.md) | Not started |
+| 7 | Recents Identity and Caps | Two files with the same name overwrite each other; only 2 files are remembered | [03-recents-identity-and-caps.md](November26/03-recents-identity-and-caps.md) | Not started |
+| 8 | Scan History | No memory of the last scan, so no way to see what is new — and no reason to return | [04-scan-history.md](November26/04-scan-history.md) | Not started |
+
+## Next release
+
+Features 5–8 make up the **[November 2026 release](November26/README.md)**. That folder holds the four plans, numbered in the order they are to be implemented.
 
 Feature 1's phase 2 — surfacing **newly introduced CVEs** between the two documents — is not yet built. See the plan for the API-cap consideration it raises.
 

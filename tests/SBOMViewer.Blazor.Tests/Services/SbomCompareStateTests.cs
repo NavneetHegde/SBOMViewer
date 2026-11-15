@@ -17,6 +17,39 @@ public class SbomCompareStateTests
         => Load(TestData.TestJson.ValidCycloneDXWithComponents, SbomFormat.CycloneDX_1_6, fileName);
 
     [Fact]
+    public void SampleFlag_FollowsItsDocumentThroughSwapAndClear()
+    {
+        // The viewer hands the demo over as the baseline; "Open in viewer" must be able to tell
+        // it is still the demo, whichever slot it has since been swapped into.
+        var state = new SbomCompareState();
+        state.SetBaseline(CycloneDx("demo.json"), isSample: true);
+        state.SetCurrent(CycloneDx("mine.json"));
+
+        state.BaselineIsSample.Should().BeTrue();
+        state.CurrentIsSample.Should().BeFalse();
+
+        state.Swap();
+
+        state.BaselineIsSample.Should().BeFalse();
+        state.CurrentIsSample.Should().BeTrue();
+
+        state.ClearCurrent();
+
+        state.CurrentIsSample.Should().BeFalse();
+    }
+
+    [Fact]
+    public void SetBaseline_ReplacingTheSampleWithARealFile_DropsTheFlag()
+    {
+        var state = new SbomCompareState();
+        state.SetBaseline(CycloneDx("demo.json"), isSample: true);
+
+        state.SetBaseline(CycloneDx("mine.json"));
+
+        state.BaselineIsSample.Should().BeFalse();
+    }
+
+    [Fact]
     public void Diff_IsNullUntilBothSlotsFilled()
     {
         var state = new SbomCompareState();
