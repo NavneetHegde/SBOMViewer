@@ -208,7 +208,7 @@ body {
 /* ── Upload screen ─────────────────────────────────────────────────────────── */
 .upload-screen {
   flex: 1; display: flex; flex-direction: column;
-  align-items: center; gap: 48px;
+  align-items: center; gap: 28px;
   position: relative; background: var(--bg);
   /* Scroll rather than clip when the two option cards exceed the viewport (short or narrow
      screens). "safe center" keeps the content centred while it fits, but falls back to
@@ -664,37 +664,92 @@ body {
   .upload-hero p { white-space: normal; max-width: 440px; }
 }
 
+/* ── Try a sample ──────────────────────────────────────────────────────────── */
+
+/* One row above the two cards holding the sample button and the recent files, so neither can
+   be pushed below the fold by the cards. */
+.quick-row {
+  position: relative; z-index: 1; width: min(920px, 92vw);
+  display: flex; align-items: stretch; gap: 12px; flex-wrap: wrap; justify-content: center;
+}
+.sample-link {
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  padding: 8px 16px 8px 10px; border-radius: 12px; cursor: pointer;
+  border: 1.5px solid var(--accent); background: var(--accent-glow);
+  font-family: var(--sans); text-align: left; transition: all 0.2s;
+}
+.sample-link:hover:not(:disabled) { box-shadow: 0 0 28px var(--accent-glow); transform: translateY(-1px); }
+.sample-link:disabled { opacity: 0.6; cursor: default; }
+.sample-link-icon {
+  width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent); color: #fff; font-size: 0.75rem;
+}
+.sample-link-text { display: flex; flex-direction: column; gap: 1px; }
+.sample-link-hint { font-size: 0.6875rem; color: var(--text-dim); }
+.sample-link-label { font-size: 0.875rem; font-weight: 600; color: var(--accent); }
+
+/* Marks the bundled demo document in the viewer so it is not mistaken for the user's own file. */
+.sample-chip {
+  display: inline-block; vertical-align: middle; margin-left: 6px;
+  font-family: var(--mono); font-size: 0.625rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.07em; word-break: normal;
+  padding: 2px 7px; border-radius: 99px;
+  color: var(--accent); background: var(--accent-glow); border: 1px solid var(--accent);
+}
+
 /* ── Recent SBOMs ──────────────────────────────────────────────────────────── */
 
 .recent-bar {
-  position: relative; z-index: 1; width: min(920px, 92vw);
-  display: flex; flex-direction: column; gap: 10px;
+  flex: 1 1 380px; min-width: 0;
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 12px; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--bg2);
 }
-.recent-bar-head { display: flex; align-items: center; justify-content: space-between; }
 .recent-bar-title {
-  font-size: 0.75rem; color: var(--text-dimmer); font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.09em;
+  font-size: 0.6875rem; color: var(--text-dimmer); font-weight: 600; flex-shrink: 0;
+  text-transform: uppercase; letter-spacing: 0.09em; cursor: help;
 }
 .recent-clear {
-  background: none; border: none; cursor: pointer;
+  background: none; border: none; cursor: pointer; flex-shrink: 0;
   font-size: 0.75rem; color: var(--text-dimmer); padding: 2px 4px;
 }
 .recent-clear:hover { color: var(--crit); text-decoration: underline; }
 
-.recent-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.recent-list { flex: 1; min-width: 0; display: flex; gap: 8px; }
 .recent-item {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
-  padding: 11px 14px; border-radius: 10px; cursor: pointer;
-  border: 1px solid var(--border); background: var(--bg2);
-  text-align: left; min-width: 0; transition: all 0.2s;
+  flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  padding: 5px 10px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg);
+  text-align: left; transition: all 0.2s;
 }
 .recent-item:hover { border-color: var(--accent); background: var(--accent-glow); }
 .recent-item-name {
-  font-family: var(--mono); font-size: 0.8125rem; color: var(--text);
+  font-family: var(--mono); font-size: 0.75rem; color: var(--text);
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.recent-item-meta { font-size: 0.6875rem; color: var(--text-dimmer); }
-.recent-note { font-size: 0.6875rem; color: var(--text-dimmer); text-align: center; }
+.recent-item-meta {
+  font-size: 0.6875rem; color: var(--text-dimmer);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Short viewports (laptops): tighten the landing page so hero, quick row and both cards fit
+   without scrolling. */
+@media (max-height: 820px) {
+  .upload-screen { gap: 20px; padding-block: 18px; }
+  .upload-hero h1 { font-size: clamp(1.75rem, 3.4vw, 2.5rem); margin-bottom: 8px; }
+  .upload-options > .dropzone,
+  .upload-options > .compare-card { padding-block: 18px; gap: 10px; }
+  .upload-options .dropzone-icon { width: 46px; height: 46px; font-size: 1.25rem; }
+}
+@media (max-height: 700px) {
+  .upload-screen { gap: 14px; padding-block: 10px; }
+}
+@media (max-width: 720px) {
+  .recent-list { flex-direction: column; }
+  .sample-link { flex: 1 1 100%; }
+}
 
 /* Recent shortcuts inside an empty comparison slot. */
 .slot-recent { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

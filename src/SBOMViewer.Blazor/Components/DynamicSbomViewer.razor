@@ -94,7 +94,13 @@
 
             @* SBOM meta widget *@
             <div class="sbom-meta">
-                <div class="sbom-meta-name">@FileName</div>
+                <div class="sbom-meta-name">
+                    @FileName
+                    @if (SbomState.IsSample)
+                    {
+                        <span class="sample-chip" title="Bundled demo data — not one of your files">Sample</span>
+                    }
+                </div>
                 @if (SbomState.DetectedFormat is not null)
                 {
                     <div class="sbom-meta-row"><span>Format</span><span>@GetFormatName(SbomState.DetectedFormat.Value)</span></div>
@@ -608,7 +614,7 @@
                 r.License.Contains(q, StringComparison.OrdinalIgnoreCase));
 
         if (_compSevFilter is not null)
-            rows = rows.Where(r => _vulnWorstSev.GetValueOrDefault(r.Name) == _compSevFilter);
+            rows = rows.Where(r => _vulnWorstSev.GetValueOrDefault(r.OsvName) == _compSevFilter);
 
         static int SevOrd(string s) => s switch { "CRITICAL" => 0, "HIGH" => 1, "MEDIUM" => 2, "LOW" => 3, "NONE" => 4, _ => 5 };
 
@@ -617,8 +623,8 @@
             "version" => _compSortAsc ? rows.OrderBy(r => r.Version)    : rows.OrderByDescending(r => r.Version),
             "type"    => _compSortAsc ? rows.OrderBy(r => r.Type)       : rows.OrderByDescending(r => r.Type),
             "license" => _compSortAsc ? rows.OrderBy(r => r.License)    : rows.OrderByDescending(r => r.License),
-            "risk"    => _compSortAsc ? rows.OrderBy(r => SevOrd(_vulnWorstSev.GetValueOrDefault(r.Name, "NONE")))
-                                      : rows.OrderByDescending(r => SevOrd(_vulnWorstSev.GetValueOrDefault(r.Name, "NONE"))),
+            "risk"    => _compSortAsc ? rows.OrderBy(r => SevOrd(_vulnWorstSev.GetValueOrDefault(r.OsvName, "NONE")))
+                                      : rows.OrderByDescending(r => SevOrd(_vulnWorstSev.GetValueOrDefault(r.OsvName, "NONE"))),
             _         => _compSortAsc ? rows.OrderBy(r => r.Name)       : rows.OrderByDescending(r => r.Name),
         };
 
@@ -658,8 +664,8 @@
                     <tbody>
                         @foreach (var r in list)
                         {
-                            var worstSev = _vulnWorstSev.GetValueOrDefault(r.Name, "NONE");
-                            var vulnCnt  = _vulnCounts.GetValueOrDefault(r.Name, 0);
+                            var worstSev = _vulnWorstSev.GetValueOrDefault(r.OsvName, "NONE");
+                            var vulnCnt  = _vulnCounts.GetValueOrDefault(r.OsvName, 0);
                             <tr>
                                 <td>
                                     <div class="td-name">@r.Name</div>

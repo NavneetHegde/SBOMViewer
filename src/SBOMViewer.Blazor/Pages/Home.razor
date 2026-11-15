@@ -152,7 +152,6 @@
     private void NewFile()
     {
         SbomState.Clear();
-        ChatState.ClearVulnerabilities();
     }
 
     private async Task ExportReport() => await JS.InvokeVoidAsync("sbomPrintReport");
@@ -186,7 +185,7 @@
         if (!result.Success) return;
 
         CompareState.Clear();
-        CompareState.SetBaseline(result);
+        CompareState.SetBaseline(result, SbomState.IsSample);
         Nav.NavigateTo("compare");
     }
 

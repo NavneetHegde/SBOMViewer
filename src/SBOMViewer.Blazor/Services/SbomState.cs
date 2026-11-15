@@ -3,7 +3,11 @@ using SBOMViewer.Blazor.Models;
 
 namespace SBOMViewer.Blazor.Services;
 
-public class SbomState
+/// <param name="chatState">
+/// Scan results describe one document, so they are reset here whenever the document changes —
+/// no caller has to remember to. Optional so the state can be built on its own in tests.
+/// </param>
+public class SbomState(ChatState? chatState = null)
 {
     public event Action? OnChange;
 
@@ -23,6 +27,31 @@ public class SbomState
     public SbomFormat? DetectedFormat { get; set; }
     public string? FileName { get; set; }
 
+    /// <summary>
+    /// True while the bundled demo document is open, so the viewer can label it and nobody
+    /// mistakes demo data for their own. Assigned by <see cref="Load"/>.
+    /// </summary>
+    public bool IsSample { get; private set; }
+
+    /// <summary>
+    /// The one way to open a document. Every field is assigned on every call — so a real file
+    /// opened after the demo cannot inherit its label — and <see cref="Document"/> goes last,
+    /// because assigning it is what notifies subscribers.
+    /// </summary>
+    public void Load(SbomLoadResult result, bool isSample = false)
+    {
+        if (!result.Success) return;
+
+        // First, while the previous document is still in place: clearing notifies subscribers too.
+        chatState?.ClearVulnerabilities();
+
+        Schema         = result.Schema;
+        DetectedFormat = result.Format;
+        FileName       = result.FileName;
+        IsSample       = isSample;
+        Document       = result.Document;
+    }
+
     public void Clear()
     {
         _document?.Dispose();
@@ -30,6 +59,8 @@ public class SbomState
         Schema = null;
         DetectedFormat = null;
         FileName = null;
+        IsSample = false;
+        chatState?.ClearVulnerabilities();
         NotifyStateChanged();
     }
 

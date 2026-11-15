@@ -44,7 +44,14 @@ public static class ComponentRowExtractor
                 }
             }
             if (!string.IsNullOrEmpty(name))
-                rows.Add(new ComponentRow(name, version, type, license, purl, LicenseClassifier.Classify(license)));
+            {
+                // Same inputs PackageExtractor uses for the scan, so the two names cannot disagree.
+                var group = comp.TryGetProperty("group", out var g) ? g.GetString() : null;
+                rows.Add(new ComponentRow(name, version, type, license, purl, LicenseClassifier.Classify(license))
+                {
+                    OsvName = PackageExtractor.OsvName(name, purl, group)
+                });
+            }
         }
 
         return rows;
@@ -63,8 +70,11 @@ public static class ComponentRowExtractor
             var version = pkg.TryGetProperty("versionInfo",      out var v) ? v.GetString() ?? "" : "";
             var license = pkg.TryGetProperty("licenseConcluded", out var l) ? l.GetString() ?? "" : "";
             if (license is "NOASSERTION" or "NONE") license = "";
-            string? purl = null;
-            if (pkg.TryGetProperty("externalRefs", out var refs) && refs.ValueKind == JsonValueKind.Array)
+            // Prefer the reference that actually is a purl — the same one the scan uses. Only when
+            // there is none fall back to the first package-manager locator, for display.
+            var scanPurl = PackageExtractor.ExtractPurlFromExternalRefs(pkg);
+            var purl = scanPurl;
+            if (purl is null && pkg.TryGetProperty("externalRefs", out var refs) && refs.ValueKind == JsonValueKind.Array)
             {
                 foreach (var r in refs.EnumerateArray())
                 {
@@ -75,7 +85,10 @@ public static class ComponentRowExtractor
                 }
             }
             if (!string.IsNullOrEmpty(name))
-                rows.Add(new ComponentRow(name, version, "package", license, purl, LicenseClassifier.Classify(license)));
+                rows.Add(new ComponentRow(name, version, "package", license, purl, LicenseClassifier.Classify(license))
+                {
+                    OsvName = PackageExtractor.OsvName(name, scanPurl)
+                });
         }
 
         return rows;
@@ -103,7 +116,10 @@ public static class ComponentRowExtractor
             if (license is "NOASSERTION" or "NONE") license = "";
 
             if (!string.IsNullOrEmpty(name))
-                rows.Add(new ComponentRow(name, version, "package", license, purl, LicenseClassifier.Classify(license)));
+                rows.Add(new ComponentRow(name, version, "package", license, purl, LicenseClassifier.Classify(license))
+                {
+                    OsvName = PackageExtractor.OsvName(name, purl)
+                });
         }
 
         return rows;

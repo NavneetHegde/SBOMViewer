@@ -2,9 +2,9 @@
 @using SBOMViewer.Blazor.Models
 @inject SbomState SbomState
 @inject SbomLoader SbomLoader
-@inject ChatState ChatState
 @inject RecentSbomStore RecentStore
 @inject NavigationManager Nav
+@inject HttpClient Http
 
 <div class="upload-screen">
     <div class="upload-grid"></div>
@@ -15,6 +15,43 @@
            isn't — it queries OSV.dev. What is unconditionally true is that the file never leaves. *@
         <p>Vulnerabilities, licenses, and dependencies — your SBOM file is never uploaded.</p>
     </div>
+
+    @* Quick-start row. It sits ABOVE the two cards so the sample and the recent files are in view
+       without scrolling, however tall the cards get. It is also outside .dropzone on purpose:
+       the InputFile overlay covers that whole area and would swallow the clicks. *@
+    <div class="quick-row fadein" style="animation-delay:0.06s;">
+        <button class="sample-link" @onclick="LoadSample" disabled="@_isLoading"
+                title="Open a demo SBOM — nothing is stored or uploaded">
+            <span class="sample-link-icon">▶</span>
+            <span class="sample-link-text">
+                <span class="sample-link-hint">No SBOM handy?</span>
+                <span class="sample-link-label">Try a sample →</span>
+            </span>
+        </button>
+
+        @if (_recent.Count > 0)
+        {
+            <div class="recent-bar">
+                <span class="recent-bar-title" title="Kept in this browser only — never uploaded anywhere.">Recent</span>
+                <div class="recent-list">
+                    @foreach (var item in _recent)
+                    {
+                        <button class="recent-item" @onclick="() => OpenRecent(item)"
+                                title="@($"{item.Name} — {item.Format} · {item.SizeLabel} · kept in this browser only")">
+                            <span class="recent-item-name">@item.Name</span>
+                            <span class="recent-item-meta">@item.Format · @item.SavedAgo(DateTimeOffset.Now)</span>
+                        </button>
+                    }
+                </div>
+                <button class="recent-clear" @onclick="ClearRecent" title="Forget the files stored in this browser">Clear</button>
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(_errorMessage))
+    {
+        <div class="upload-error fadein">⚠ @_errorMessage</div>
+    }
 
     <div class="upload-options">
         <div class="dropzone @(_drag ? "dragover" : "") fadein"
@@ -58,31 +95,6 @@
         </a>
     </div>
 
-    @if (!string.IsNullOrEmpty(_errorMessage))
-    {
-        <div class="upload-error fadein">⚠ @_errorMessage</div>
-    }
-
-    @if (_recent.Count > 0)
-    {
-        <div class="recent-bar fadein" style="animation-delay:0.24s;">
-            <div class="recent-bar-head">
-                <span class="recent-bar-title">Recent</span>
-                <button class="recent-clear" @onclick="ClearRecent" title="Forget the files stored in this browser">Clear</button>
-            </div>
-            <div class="recent-list">
-                @foreach (var item in _recent)
-                {
-                    <button class="recent-item" @onclick="() => OpenRecent(item)" title="@item.Name">
-                        <span class="recent-item-name">@item.Name</span>
-                        <span class="recent-item-meta">@item.Format · @item.SizeLabel · @item.SavedAgo(DateTimeOffset.Now)</span>
-                    </button>
-                }
-            </div>
-            <p class="recent-note">Kept in this browser only — never uploaded anywhere.</p>
-        </div>
-    }
-
     @if (_isLoading)
     {
         <div style="position:fixed; top:0; left:0; right:0; bottom:0; background:oklch(11% 0.018 240 / 0.85); display:flex; flex-direction:column; justify-content:center; align-items:center; gap:16px; z-index:1000;">
@@ -101,9 +113,80 @@
 
     private bool _drag => _dragCounter > 0;
 
-    protected override async Task OnInitializedAsync() => await RefreshRecent();
+    private const string SampleFileName = "demo-storefront.cdx.json";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Started, not awaited: the recents list and the deep link are independent, and a slow or
+        // stalled IndexedDB must not hold the demo back behind a list the viewer then replaces.
+        var recent = RefreshRecent();
+
+        // Deep link: /?sample=1 opens the demo directly, so the README and social posts can link
+        // straight into a loaded dashboard.
+        if (SbomState.Document is null && IsSampleDeepLink())
+        {
+            // Strip the parameter first — otherwise "New file" would land back on a URL that
+            // immediately reloads the sample. Only "sample" goes: campaign parameters and the
+            // fragment on a shared link are kept.
+            Nav.NavigateTo(Nav.GetUriWithQueryParameter("sample", (string?)null), replace: true);
+            await LoadSample();
+        }
+
+        await recent;
+    }
+
+    private bool IsSampleDeepLink() =>
+        System.Web.HttpUtility.ParseQueryString(new Uri(Nav.Uri).Query)["sample"] == "1";
 
     private async Task RefreshRecent() => _recent = await RecentStore.ListAsync();
+
+    private void Show(SbomLoadResult result, bool isSample = false) => SbomState.Load(result, isSample);
+
+    private async Task LoadSample()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            // The registered HttpClient has no BaseAddress, so a relative URL would throw.
+            var url  = new Uri(new Uri(Nav.BaseUri), $"samples/{SampleFileName}");
+            var json = await Http.GetStringAsync(url);
+
+            // Load(string, string) does not save to the recents store — a demo file must not
+            // evict one of the user's two real recents.
+            var result = SbomLoader.Load(json, SampleFileName);
+            if (!result.Success)
+            {
+                _errorMessage = result.Error;
+                return;
+            }
+
+            Show(result, isSample: true);
+        }
+        catch (Exception ex)
+        {
+            // Deliberately broad. On the deep-link path this runs inside OnInitializedAsync, where
+            // anything that escapes takes the whole page down to the Blazor error UI.
+            if (ex is HttpRequestException or TaskCanceledException)
+            {
+                _errorMessage = "Couldn't load the sample. Check your connection and try again.";
+            }
+            else
+            {
+                // Not a network problem, so retrying will not help — say so, and leave the detail
+                // in the browser console where it can be diagnosed.
+                Console.Error.WriteLine($"Sample load failed: {ex}");
+                _errorMessage = "Couldn't load the sample — something went wrong opening it.";
+            }
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
 
     private async Task OpenRecent(RecentSbom item)
     {
@@ -129,11 +212,7 @@
                 return;
             }
 
-            ChatState.ClearVulnerabilities();
-            SbomState.Schema         = result.Schema;
-            SbomState.DetectedFormat = result.Format;
-            SbomState.FileName       = result.FileName;
-            SbomState.Document       = result.Document;
+            Show(result);
         }
         finally
         {
@@ -160,7 +239,6 @@
         _isLoading = true;
         _errorMessage = null;
         _dragCounter = 0;
-        ChatState.ClearVulnerabilities();
         StateHasChanged();
 
         try
@@ -174,10 +252,7 @@
                 return;
             }
 
-            SbomState.Schema = result.Schema;
-            SbomState.DetectedFormat = result.Format;
-            SbomState.FileName = result.FileName;
-            SbomState.Document = result.Document;
+            Show(result);
         }
         finally
         {
