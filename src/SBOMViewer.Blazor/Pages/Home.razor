@@ -186,7 +186,7 @@
         if (!result.Success) return;
 
         CompareState.Clear();
-        CompareState.SetBaseline(result);
+        CompareState.SetBaseline(result, SbomState.IsSample);
         Nav.NavigateTo("compare");
     }
 

@@ -34,6 +34,124 @@ public class PackageExtractorTests
     }
 
     [Fact]
+    public void ExtractPackages_CycloneDX_JoinsGroupIntoTheNameOsvIndexes()
+    {
+        // CycloneDX carries the Maven groupId and the npm scope in a separate "group" field. OSV
+        // indexes those packages as group:artifact and @scope/name, so the bare name finds nothing.
+        var json = """
+            {
+                "bomFormat": "CycloneDX",
+                "specVersion": "1.6",
+                "components": [
+                    { "group": "org.apache.logging.log4j", "name": "log4j-core", "version": "2.14.1", "purl": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1" },
+                    { "group": "@babel", "name": "traverse", "version": "7.22.0", "purl": "pkg:npm/%40babel/traverse@7.22.0" },
+                    { "group": "@babel", "name": "@babel/core", "version": "7.22.0", "purl": "pkg:npm/%40babel/core@7.22.0" },
+                    { "group": "org.example", "name": "org.example:already-joined", "version": "1.0.0", "purl": "pkg:maven/org.example/already-joined@1.0.0" },
+                    { "group": "Microsoft", "name": "Newtonsoft.Json", "version": "13.0.3", "purl": "pkg:nuget/Newtonsoft.Json@13.0.3" },
+                    { "group": "org.example", "name": "no-purl", "version": "1.0.0" }
+                ]
+            }
+            """;
+        using var doc = JsonDocument.Parse(json);
+
+        var result = PackageExtractor.ExtractPackages(doc.RootElement, SbomFormat.CycloneDX_1_6);
+
+        result.Select(p => p.Name).Should().Equal(
+            "org.apache.logging.log4j:log4j-core",
+            "@babel/traverse",
+            "@babel/core",
+            "org.example:already-joined",
+            "Newtonsoft.Json",   // other ecosystems have no group in their OSV name
+            "no-purl");          // no purl, no known ecosystem — leave the name alone
+    }
+
+    [Fact]
+    public void ExtractPackages_CycloneDX_DerivesTheOsvNameFromThePurlWhenThereIsNoUsableGroup()
+    {
+        var json = """
+            {
+                "bomFormat": "CycloneDX",
+                "specVersion": "1.6",
+                "components": [
+                    { "name": "log4j-core", "version": "2.14.1", "purl": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1?type=jar" },
+                    { "group": "babel", "name": "core", "version": "7.22.0", "purl": "pkg:npm/%40babel/core@7.22.0" },
+                    { "group": "babel", "name": "parser", "version": "7.22.0", "purl": "pkg:npm/parser@7.22.0" },
+                    { "group": "github.com/gin-gonic", "name": "gin", "version": "v1.9.0", "purl": "pkg:golang/github.com/gin-gonic/gin@v1.9.0" },
+                    { "group": "symfony", "name": "console", "version": "6.3.0", "purl": "pkg:composer/symfony/console@6.3.0" },
+                    { "name": "lodash", "version": "4.17.21", "purl": "pkg:npm/lodash@4.17.21" }
+                ]
+            }
+            """;
+        using var doc = JsonDocument.Parse(json);
+
+        var result = PackageExtractor.ExtractPackages(doc.RootElement, SbomFormat.CycloneDX_1_6);
+
+        result.Select(p => p.Name).Should().Equal(
+            "org.apache.logging.log4j:log4j-core",
+            "@babel/core",
+            "@babel/parser",                // purl has no namespace — fall back to the group, adding the "@"
+            "github.com/gin-gonic/gin",
+            "symfony/console",
+            "lodash");
+    }
+
+    [Fact]
+    public void ExtractPackages_Spdx_DerivesTheOsvNameFromThePurl()
+    {
+        // SPDX has no "group" field at all, so the purl is the only place the namespace lives.
+        var spdx2 = """
+            {
+                "spdxVersion": "SPDX-2.3",
+                "packages": [
+                    {
+                        "name": "log4j-core", "versionInfo": "2.14.1",
+                        "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1" } ]
+                    }
+                ]
+            }
+            """;
+        var spdx3 = """
+            {
+                "@graph": [
+                    { "type": "software_Package", "name": "traverse", "software_packageVersion": "7.22.0", "software_packageUrl": "pkg:npm/%40babel/traverse@7.22.0" }
+                ]
+            }
+            """;
+        using var doc2 = JsonDocument.Parse(spdx2);
+        using var doc3 = JsonDocument.Parse(spdx3);
+
+        PackageExtractor.ExtractPackages(doc2.RootElement, SbomFormat.SPDX_2_3)
+            .Single().Name.Should().Be("org.apache.logging.log4j:log4j-core");
+        PackageExtractor.ExtractPackages(doc3.RootElement, SbomFormat.SPDX_3_0)
+            .Single().Name.Should().Be("@babel/traverse");
+    }
+
+    [Fact]
+    public void OsvName_MatchesBetweenScanPackagesAndComponentRows()
+    {
+        // The Components tab joins scan results onto its rows by this name. If the two extractors
+        // ever disagree, every namespaced component silently shows "no vulnerabilities".
+        using var doc = JsonDocument.Parse("""
+            {
+                "bomFormat": "CycloneDX",
+                "specVersion": "1.6",
+                "components": [
+                    { "group": "org.apache.logging.log4j", "name": "log4j-core", "version": "2.14.1", "purl": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1" },
+                    { "group": "@babel", "name": "traverse", "version": "7.22.0", "purl": "pkg:npm/%40babel/traverse@7.22.0" },
+                    { "name": "Newtonsoft.Json", "version": "13.0.3", "purl": "pkg:nuget/Newtonsoft.Json@13.0.3" },
+                    { "name": "no-purl", "version": "1.0.0" }
+                ]
+            }
+            """);
+
+        var scanned = PackageExtractor.ExtractPackages(doc.RootElement, SbomFormat.CycloneDX_1_6).Select(p => p.Name);
+        var rowKeys = ComponentRowExtractor.Extract(doc.RootElement, SbomFormat.CycloneDX_1_6)
+            .Select(r => PackageExtractor.OsvName(r.Name, r.Purl));
+
+        rowKeys.Should().Equal(scanned);
+    }
+
+    [Fact]
     public void ExtractPackages_CycloneDX17_ExtractsComponents()
     {
         var json = """

@@ -39,7 +39,7 @@
                          Awaiting="@(CompareState.HasCurrent && !CompareState.HasBaseline)"
                          OnLoaded="OnBaselineLoaded"
                          OnCleared="@(() => CompareState.ClearBaseline())"
-                         OnOpenInViewer="@(() => OpenInViewer(CompareState.BaselineDocument, CompareState.BaselineFileName))"
+                         OnOpenInViewer="@(() => OpenInViewer(CompareState.BaselineDocument, CompareState.BaselineFileName, CompareState.BaselineIsSample))"
                          Recent="@_recent" />
 
             @if (CompareState.HasBaseline || CompareState.HasCurrent)
@@ -62,7 +62,7 @@
                          Awaiting="@(CompareState.HasBaseline && !CompareState.HasCurrent)"
                          OnLoaded="OnCurrentLoaded"
                          OnCleared="@(() => CompareState.ClearCurrent())"
-                         OnOpenInViewer="@(() => OpenInViewer(CompareState.CurrentDocument, CompareState.CurrentFileName))"
+                         OnOpenInViewer="@(() => OpenInViewer(CompareState.CurrentDocument, CompareState.CurrentFileName, CompareState.CurrentIsSample))"
                          Recent="@_recent" />
         </div>
 
@@ -243,7 +243,7 @@
     /// Re-parsed rather than shared: SbomState and SbomCompareState each dispose the JsonDocument
     /// they hold, so handing over the same instance would dispose it out from under the other.
     /// </summary>
-    private void OpenInViewer(System.Text.Json.JsonDocument? document, string? fileName)
+    private void OpenInViewer(System.Text.Json.JsonDocument? document, string? fileName, bool isSample)
     {
         if (document is null) return;
 
@@ -251,10 +251,7 @@
         if (!result.Success) return;
 
         ChatState.ClearVulnerabilities();
-        SbomState.Schema         = result.Schema;
-        SbomState.DetectedFormat = result.Format;
-        SbomState.FileName       = result.FileName;
-        SbomState.Document       = result.Document;
+        SbomState.Load(result, isSample);
 
         Nav.NavigateTo("");
     }

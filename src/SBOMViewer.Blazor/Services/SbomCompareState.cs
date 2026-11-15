@@ -35,10 +35,17 @@ public class SbomCompareState
     public int BaselineComponentCount => _baseline.ComponentCount;
     public int CurrentComponentCount  => _current.ComponentCount;
 
-    public void SetBaseline(SbomLoadResult result) => Set(ref _baseline, result);
-    public void SetCurrent(SbomLoadResult result)  => Set(ref _current,  result);
+    /// <summary>
+    /// Whether a slot holds the bundled demo document. Carried here so the "Sample" label
+    /// survives a round trip from the viewer, through the comparison, and back.
+    /// </summary>
+    public bool BaselineIsSample => _baseline.IsSample;
+    public bool CurrentIsSample  => _current.IsSample;
 
-    private void Set(ref Slot slot, SbomLoadResult result)
+    public void SetBaseline(SbomLoadResult result, bool isSample = false) => Set(ref _baseline, result, isSample);
+    public void SetCurrent(SbomLoadResult result, bool isSample = false)  => Set(ref _current,  result, isSample);
+
+    private void Set(ref Slot slot, SbomLoadResult result, bool isSample)
     {
         if (!result.Success) return;
 
@@ -47,7 +54,8 @@ public class SbomCompareState
             result.Document,
             result.Format,
             result.FileName,
-            ComponentRowExtractor.Extract(result.Document!.RootElement, result.Format).Count);
+            ComponentRowExtractor.Extract(result.Document!.RootElement, result.Format).Count,
+            isSample);
         Recompute();
     }
 
@@ -90,8 +98,8 @@ public class SbomCompareState
         OnChange?.Invoke();
     }
 
-    private readonly record struct Slot(JsonDocument? Document, SbomFormat? Format, string? FileName, int ComponentCount)
+    private readonly record struct Slot(JsonDocument? Document, SbomFormat? Format, string? FileName, int ComponentCount, bool IsSample)
     {
-        public static Slot Empty => new(null, null, null, 0);
+        public static Slot Empty => new(null, null, null, 0, false);
     }
 }

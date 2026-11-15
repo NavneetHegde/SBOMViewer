@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Local run settings for the Playwright E2E tests — used by Visual Studio Test Explorer.
+
+  The E2E tests are black-box: they do not start the app, they open a browser against BASE_URL.
+  This file points them at the dev server, so the local loop is:
+
+      1. Start the app: "dotnet run" in src/SBOMViewer.Blazor, or F5   (serves https://localhost:5157)
+      2. Run the tests from Test Explorer
+
+  Wired in by SBOMViewer.E2E.Tests.csproj for Visual Studio only. Command-line and CI runs do not
+  load it — they keep using the BASE_URL environment variable (default http://localhost:5000),
+  as documented in CLAUDE.md.
+-->
+<RunSettings>
+  <RunConfiguration>
+    <EnvironmentVariables>
+      <BASE_URL>https://localhost:5157</BASE_URL>
+    </EnvironmentVariables>
+  </RunConfiguration>
+</RunSettings>

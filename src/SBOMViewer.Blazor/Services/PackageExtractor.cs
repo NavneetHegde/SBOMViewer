@@ -38,10 +38,70 @@ public static partial class PackageExtractor
                 continue;
 
             var ecosystem = ParseEcosystemFromPurl(purl);
-            packages.Add(new PackageInfo(name, version, ecosystem, purl));
+            var group = comp.TryGetProperty("group", out var g) ? g.GetString() : null;
+            packages.Add(new PackageInfo(OsvName(name, purl, group), version, ecosystem, purl));
         }
 
         return packages;
+    }
+
+    /// <summary>
+    /// The name OSV indexes a package under. SBOMs usually carry only the short name
+    /// (<c>log4j-core</c>), while OSV wants the namespace joined in: <c>group:artifact</c> for
+    /// Maven, <c>@scope/name</c> for npm, <c>vendor/name</c> for Packagist and the full module
+    /// path for Go. Querying with the bare name returns nothing — or, worse, another package's
+    /// advisories.
+    ///
+    /// The purl is the source of truth because every format carries it. The CycloneDX
+    /// <paramref name="group"/> field is only a fallback for a purl with no namespace.
+    ///
+    /// Public because the Components tab has to compute the same key to join scan results back
+    /// onto its rows.
+    /// </summary>
+    public static string OsvName(string name, string? purl, string? group = null)
+    {
+        var ecosystem = ParseEcosystemFromPurl(purl);
+        var (ns, purlName) = ParsePurlName(purl);
+
+        if (ns is null || purlName is null)
+            return QualifyName(name, group, ecosystem);
+
+        return ecosystem switch
+        {
+            "Maven" => $"{ns}:{purlName}",
+            "npm" or "Go" or "Packagist" => $"{ns}/{purlName}",
+            _ => name
+        };
+    }
+
+    /// <summary>Splits the purl's name part into (namespace, name); both null when it has no namespace.</summary>
+    private static (string? Namespace, string? Name) ParsePurlName(string? purl)
+    {
+        if (string.IsNullOrEmpty(purl)) return (null, null);
+
+        var match = PurlRegex().Match(purl);
+        if (!match.Success) return (null, null);
+
+        var full = match.Groups["name"].Value.Trim('/');
+        var slash = full.LastIndexOf('/');
+        if (slash <= 0 || slash == full.Length - 1) return (null, null);
+
+        // Segments are percent-encoded individually — a scoped npm package is "%40scope/name".
+        var ns = string.Join('/', full[..slash].Split('/').Select(Uri.UnescapeDataString));
+        return (ns, Uri.UnescapeDataString(full[(slash + 1)..]));
+    }
+
+    private static string QualifyName(string name, string? group, string? ecosystem)
+    {
+        if (string.IsNullOrEmpty(group)) return name;
+
+        return ecosystem switch
+        {
+            "Maven" when !name.Contains(':') => $"{group}:{name}",
+            // An npm group can only be a scope; some generators drop the leading "@".
+            "npm" when !name.StartsWith('@') => $"{(group.StartsWith('@') ? group : "@" + group)}/{name}",
+            _ => name
+        };
     }
 
     private static List<PackageInfo> ExtractSpdx(JsonElement root)
@@ -62,7 +122,7 @@ public static partial class PackageExtractor
 
             var purl = ExtractPurlFromExternalRefs(pkg);
             var ecosystem = ParseEcosystemFromPurl(purl);
-            packages.Add(new PackageInfo(name, version, ecosystem, purl));
+            packages.Add(new PackageInfo(OsvName(name, purl), version, ecosystem, purl));
         }
 
         return packages;
@@ -88,7 +148,7 @@ public static partial class PackageExtractor
 
             var purl = element.TryGetProperty("software_packageUrl", out var p) ? p.GetString() : null;
             var ecosystem = ParseEcosystemFromPurl(purl);
-            packages.Add(new PackageInfo(name, version, ecosystem, purl));
+            packages.Add(new PackageInfo(OsvName(name, purl), version, ecosystem, purl));
         }
 
         return packages;
@@ -133,7 +193,7 @@ public static partial class PackageExtractor
             "cargo" => "crates.io",
             "gem" => "RubyGems",
             "golang" => "Go",
-            "packagist" => "Packagist",
+            "packagist" or "composer" => "Packagist",
             "pub" => "Pub",
             "hex" => "Hex",
             "cocoapods" => "CocoaPods",

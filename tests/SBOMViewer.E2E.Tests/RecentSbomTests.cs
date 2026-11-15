@@ -47,6 +47,68 @@ public class RecentSbomTests : TestBase
     }
 
     [Test]
+    public async Task Recent_StripIsVisibleWithoutScrollingOnALaptopScreen()
+    {
+        await ClearStoreAndReload();
+        await UploadAndReturnHome(Sample("spdx-2.3-full.json"));
+        await UploadAndReturnHome(Sample("cyclonedx-1.6-full.json"));
+
+        // With two recents the row used to sit below the cards and fall under the fold.
+        await Page.SetViewportSizeAsync(1366, 650);
+
+        await Expect(Page.Locator(".recent-item")).ToHaveCountAsync(2, new() { Timeout = 15_000 });
+        await Expect(Page.Locator(".recent-bar")).ToBeInViewportAsync(new() { Ratio = 1 });
+        await Expect(Page.Locator(".recent-clear")).ToBeInViewportAsync(new() { Ratio = 1 });
+        await Expect(Page.Locator(".sample-link")).ToBeInViewportAsync(new() { Ratio = 1 });
+    }
+
+    [Test]
+    public async Task Recent_StripSitsAboveTheUploadCards()
+    {
+        await ClearStoreAndReload();
+        await UploadAndReturnHome(Sample("cyclonedx-1.6-full.json"));
+
+        await Expect(Page.Locator(".quick-row .recent-bar")).ToBeVisibleAsync(new() { Timeout = 15_000 });
+        var strip = await Page.Locator(".recent-bar").BoundingBoxAsync();
+        var cards = await Page.Locator(".upload-options").BoundingBoxAsync();
+
+        Assert.That(strip!.Y + strip.Height, Is.LessThanOrEqualTo(cards!.Y),
+            "recent files must come before the cards, not after them");
+    }
+
+    [Test]
+    public async Task Recent_LandingPageFitsADesktopScreenWithoutScrolling()
+    {
+        await ClearStoreAndReload();
+        await UploadAndReturnHome(Sample("spdx-2.3-full.json"));
+        await UploadAndReturnHome(Sample("cyclonedx-1.6-full.json"));
+
+        await Page.SetViewportSizeAsync(1400, 900);
+        await Expect(Page.Locator(".recent-item")).ToHaveCountAsync(2, new() { Timeout = 15_000 });
+
+        // Hero, sample button, both recents and both cards together — nothing left to scroll to.
+        var overflow = await Page.EvaluateAsync<int>(
+            "() => { const e = document.querySelector('.upload-screen'); return e.scrollHeight - e.clientHeight; }");
+        Assert.That(overflow, Is.LessThanOrEqualTo(0));
+    }
+
+    [Test]
+    public async Task Recent_EntryShowsFormatAndKeepsThePrivacyNoteInItsTooltip()
+    {
+        await ClearStoreAndReload();
+        await UploadAndReturnHome(Sample("cyclonedx-1.6-full.json"));
+
+        await Expect(Page.Locator(".recent-item-meta")).ToContainTextAsync("CycloneDX 1.6", new() { Timeout = 15_000 });
+
+        // The visible "kept in this browser only" line moved into tooltips when the row was
+        // compacted; the reassurance itself must not be lost.
+        await Expect(Page.Locator(".recent-bar-title")).ToHaveAttributeAsync(
+            "title", new System.Text.RegularExpressions.Regex("this browser only"));
+        await Expect(Page.Locator(".recent-item")).ToHaveAttributeAsync(
+            "title", new System.Text.RegularExpressions.Regex("this browser only"));
+    }
+
+    [Test]
     public async Task Recent_ClickingAnEntryReopensIt()
     {
         await ClearStoreAndReload();

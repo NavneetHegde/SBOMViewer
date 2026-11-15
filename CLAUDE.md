@@ -32,6 +32,10 @@ pwsh tests/SBOMViewer.E2E.Tests/bin/Release/net10.0/playwright.ps1 install chrom
 dotnet test tests/SBOMViewer.E2E.Tests -c Release --no-build -e BASE_URL=http://localhost:5000
 ```
 
+#### E2E from Visual Studio Test Explorer
+
+The E2E tests never start the app — with nothing listening they all fail in setup with `net::ERR_CONNECTION_REFUSED`. For Test Explorer, start the app first (`dotnet run --project src/SBOMViewer.Blazor`, or F5), then run the tests: `tests/SBOMViewer.E2E.Tests/local.runsettings` sets `BASE_URL=https://localhost:5157` (the dev server). The csproj applies it **only inside Visual Studio** (`BuildingInsideVisualStudio`), so `dotnet test` and CI keep using the `BASE_URL` environment variable. The dev server is slower than the published build (about 9 minutes for the suite versus 4).
+
 ## Project Structure
 
 ```
@@ -94,6 +98,7 @@ SBOMViewer.slnx
 │           ├── sitemap.xml             # Sitemap for SEO
 │           ├── staticwebapp.config.json # Azure SWA SPA fallback so client routes (/compare) resolve
 │           ├── js/sbom-recent.js       # IndexedDB helpers for the recent-files store
+│           ├── samples/demo-storefront.cdx.json # Bundled demo SBOM behind "Try a sample" (deployed)
 │           └── css/app.css             # App styles
 └── tests/
     ├── SBOMViewer.Blazor.Tests/
@@ -107,6 +112,7 @@ SBOMViewer.slnx
     │       ├── PackageExtractorTests.cs    # Package extraction from CycloneDX (1.5/1.6/1.7) + SPDX (2.2/2.3/3.0)
     │       ├── ComponentRowExtractorTests.cs # ComponentRow extraction + license risk classification per format
     │       ├── SbomLoaderTests.cs       # Shared load pipeline: success, bad format, failed validation
+    │       ├── SampleSbomTests.cs       # Bundled demo SBOM: loads, scannable, license mix, dependencies resolve
     │       ├── SbomDiffServiceTests.cs  # purl identity, add/remove/version/license, cross-format, edge cases
     │       ├── SbomCompareStateTests.cs # Two-slot state, diff recomputation, clear/replace
     │       ├── LicenseClassifierTests.cs   # License identifier → LicenseRisk classification tests
@@ -117,7 +123,8 @@ SBOMViewer.slnx
         ├── HomePageTests.cs            # Smoke tests: title, header, upload button, badges, card, theme, footer
         ├── FileUploadTests.cs          # Upload tests: CycloneDX 1.5/1.6/1.7, SPDX 2.2/2.3/3.0.1, unsupported, invalid JSON, search
         ├── CompareTests.cs             # /compare route, two-slot upload, identical files, cross-format diff, swap, reset
-        └── RecentSbomTests.cs          # IndexedDB persistence, 2-entry cap, dedup, clear, slot shortcut
+        ├── RecentSbomTests.cs          # IndexedDB persistence, 2-entry cap, dedup, clear, slot shortcut
+        └── SampleTests.cs              # "Try a sample" link, Sample chip, /?sample=1 deep link, recents untouched
 ```
 
 ## Environment
@@ -205,9 +212,20 @@ The most recent **2** uploads are kept in IndexedDB so they can be reopened on a
 - **`wwwroot/js/sbom-recent.js`** — flat `sbomRecent*` globals (`Save`/`List`/`Get`/`Clear`), matching the naming convention of the inline scripts in `index.html`. Metadata and file content live in **separate object stores** so listing recents does not read tens of megabytes back out. `sbomRecentSave` does all its reads and writes inside one transaction — awaiting between steps would let the transaction go inactive. Re-uploading a file replaces its earlier entry rather than duplicating it
 - **`RecentSbomStore`** — thin interop wrapper. **Every call is best-effort**: IndexedDB is unavailable in some private-browsing modes, can be disabled, and can hit quota. Failures degrade to "no recents" and must never break an upload
 - **`SbomLoader.LoadAsync`** saves; the `Load(string, string)` overload does not. That split is deliberate — the string overload is used to re-parse a document when handing it between the viewer and the compare page, and those hand-offs must not churn the history
-- **UI** — a "Recent" row under the two cards on the landing page (click to reopen, plus Clear), and `Recent:` shortcut chips inside an empty comparison slot. The chips sit *outside* the dropzone because the `InputFile` overlay covers that whole area
+- **UI** — a compact "Recent" strip in the `.quick-row` above the two cards on the landing page, beside the "Try a sample" button (click to reopen, plus Clear) — above, not below, so neither is pushed under the fold, and `Recent:` shortcut chips inside an empty comparison slot. The chips sit *outside* the dropzone because the `InputFile` overlay covers that whole area
 
 Because files now persist, the compare page's privacy copy says "nothing is sent to a server" rather than the previous "nothing is stored".
+
+### Try a Sample (demo SBOM)
+
+A visitor with no SBOM on disk can open a bundled demo from the landing page ("Try a sample →") or via the deep link `/?sample=1`.
+
+- **`wwwroot/samples/demo-storefront.cdx.json`** — hand-curated CycloneDX 1.6 document for a fictional app. **Every component is a real package at a real version** (an invented purl returns nothing from OSV), across Maven, npm, PyPI and NuGet, with real registry hashes. It deliberately includes `log4j-core 2.14.1` (Log4Shell, KEV-listed), GPL/AGPL/LGPL components, one component with no license, and a few components missing hashes or supplier. Distinct from the repo-root `samples/`, which are small test fixtures and are not deployed
+- **The scan result drifts** — new CVEs are published against old versions. Never assert exact vulnerability counts against this file; `SampleSbomTests` checks structure only. Keep the total comfortably under the 200 vuln-detail cap (about 120 when curated; Django and Pillow were left out because either alone returns 80+ advisories)
+- **Loading** — `UploadFile.LoadSample()` fetches the file with an absolute URL built from `NavigationManager.BaseUri` (the registered `HttpClient` has no `BaseAddress`) and parses it with `SbomLoader.Load(string, string)`, which **does not save to recents** — the demo must not evict a real recent file
+- **`SbomState.IsSample`** — drives the "Sample" chip beside the file name in the viewer. It has a private setter: the only way to open a document is `SbomState.Load(result, isSample)`, which assigns every field and sets `Document` last, since assigning the document is what notifies subscribers. `Clear()` resets it. `SbomCompareState` carries the flag per slot (`BaselineIsSample` / `CurrentIsSample`) so the chip survives viewer → compare → "Open in viewer"
+- **Deep link** — `UploadFile.OnInitializedAsync` strips `?sample=1` with a replace-navigation before loading, so "New file" does not land on a URL that reloads the sample. Only the `sample` key is removed (`GetUriWithQueryParameter`), so campaign parameters on a shared link survive. The recents read is started but not awaited first, so a slow IndexedDB cannot delay the demo
+- **OSV package names** — SBOMs carry the short name (`log4j-core`); OSV indexes the namespaced one: `group:artifact` (Maven), `@scope/name` (npm), `vendor/name` (Packagist), full module path (Go). `PackageExtractor.OsvName` derives it **from the purl**, for every format, with the CycloneDX `group` field only as a fallback. Scan results are therefore keyed by the OSV name, not the display name — the Components tab joins them back through `VulnKey()` in `DynamicSbomViewer`, which calls the same `OsvName`
 
 ### License Risk & Compliance Reporting
 

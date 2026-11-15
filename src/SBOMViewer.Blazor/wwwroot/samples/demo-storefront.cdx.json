@@ -1,0 +1,1101 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.6.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:7d1f6c0e-3b5a-4e2c-9a41-5c8e2f0b6d13",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-15T09:00:00Z",
+    "lifecycles": [
+      {
+        "phase": "build"
+      }
+    ],
+    "authors": [
+      {
+        "name": "SBOM Viewer project"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "bom-ref": "pkg:generic/demo-storefront@2.4.0",
+      "name": "demo-storefront",
+      "version": "2.4.0",
+      "description": "Fictional online storefront used as the SBOM Viewer demo: a Java order service, a Node.js/React web front end, a Python recommendations service and a .NET admin tool.",
+      "purl": "pkg:generic/demo-storefront@2.4.0"
+    },
+    "supplier": {
+      "name": "SBOM Viewer (demo data)",
+      "url": [
+        "https://sbomviewer.com"
+      ]
+    },
+    "properties": [
+      {
+        "name": "sbomviewer:sample",
+        "value": "Hand-curated demo document. The application is fictional; every component is a real package pinned to a real, deliberately outdated version so the vulnerability scan has something to find."
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1",
+      "supplier": {
+        "name": "Apache Software Foundation"
+      },
+      "group": "org.apache.logging.log4j",
+      "name": "log4j-core",
+      "version": "2.14.1",
+      "description": "Apache Log4j logging implementation",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "9141212b8507ab50a45525b545b39d224614528b"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/org.apache.logging.log4j/log4j-api@2.14.1",
+      "supplier": {
+        "name": "Apache Software Foundation"
+      },
+      "group": "org.apache.logging.log4j",
+      "name": "log4j-api",
+      "version": "2.14.1",
+      "description": "Apache Log4j logging API",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "cd8858fbbde69f46bce8db1152c18a43328aae78"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:maven/org.apache.logging.log4j/log4j-api@2.14.1"
+    },
+    {
+      "type": "framework",
+      "bom-ref": "pkg:maven/org.springframework/spring-core@5.3.17",
+      "supplier": {
+        "name": "VMware, Inc."
+      },
+      "group": "org.springframework",
+      "name": "spring-core",
+      "version": "5.3.17",
+      "description": "Spring Framework core utilities",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "e709af88b40e1b3df193df3460faef44da41fd51"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:maven/org.springframework/spring-core@5.3.17"
+    },
+    {
+      "type": "framework",
+      "bom-ref": "pkg:maven/org.springframework/spring-beans@5.3.17",
+      "supplier": {
+        "name": "VMware, Inc."
+      },
+      "group": "org.springframework",
+      "name": "spring-beans",
+      "version": "5.3.17",
+      "description": "Spring Framework bean factory and data binding",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "3d9c415cb47c96a81b1267665f513e4676af53b4"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:maven/org.springframework/spring-beans@5.3.17"
+    },
+    {
+      "type": "framework",
+      "bom-ref": "pkg:maven/org.springframework/spring-webmvc@5.3.17",
+      "supplier": {
+        "name": "VMware, Inc."
+      },
+      "group": "org.springframework",
+      "name": "spring-webmvc",
+      "version": "5.3.17",
+      "description": "Spring Web MVC servlet framework",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "d62bd1ef6a9aee74557bd59fb96030fd52cf2fc1"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:maven/org.springframework/spring-webmvc@5.3.17"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.13.2",
+      "supplier": {
+        "name": "FasterXML, LLC"
+      },
+      "group": "com.fasterxml.jackson.core",
+      "name": "jackson-databind",
+      "version": "2.13.2",
+      "description": "JSON data binding for Jackson",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "926e48c451166a291f1ce6c6276d9abbefa7c00f"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.13.2"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/org.apache.commons/commons-text@1.9",
+      "supplier": {
+        "name": "Apache Software Foundation"
+      },
+      "group": "org.apache.commons",
+      "name": "commons-text",
+      "version": "1.9",
+      "description": "Apache Commons string algorithms and interpolation",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "ba6ac8c2807490944a0a27f6f8e68fb5ed2e80e2"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:maven/org.apache.commons/commons-text@1.9"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/com.google.guava/guava@31.1-jre",
+      "supplier": {
+        "name": "Google LLC"
+      },
+      "group": "com.google.guava",
+      "name": "guava",
+      "version": "31.1-jre",
+      "description": "Google core libraries for Java",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "60458f877d055d0c9114d9e1a2efb737b4bc282c"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:maven/com.google.guava/guava@31.1-jre"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/org.slf4j/slf4j-api@1.7.36",
+      "supplier": {
+        "name": "QOS.ch"
+      },
+      "group": "org.slf4j",
+      "name": "slf4j-api",
+      "version": "1.7.36",
+      "description": "Simple Logging Facade for Java",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "6c62681a2f655b49963a5983b8b0950a6120ae14"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:maven/org.slf4j/slf4j-api@1.7.36"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/mysql/mysql-connector-java@8.0.28",
+      "supplier": {
+        "name": "Oracle Corporation"
+      },
+      "group": "mysql",
+      "name": "mysql-connector-java",
+      "version": "8.0.28",
+      "description": "MySQL JDBC driver",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "33678b1729d4f832b9e4bcb2d5bbd67940920a7a"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "GPL-2.0-only"
+          }
+        }
+      ],
+      "purl": "pkg:maven/mysql/mysql-connector-java@8.0.28"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/org.hibernate/hibernate-core@5.6.5.Final",
+      "supplier": {
+        "name": "Red Hat, Inc."
+      },
+      "group": "org.hibernate",
+      "name": "hibernate-core",
+      "version": "5.6.5.Final",
+      "description": "Hibernate object/relational mapping core",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "d5c41d9018d16ca6076726f0f037ba8a0ebc0cb4"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "LGPL-2.1-only"
+          }
+        }
+      ],
+      "purl": "pkg:maven/org.hibernate/hibernate-core@5.6.5.Final"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/org.postgresql/postgresql@42.3.2",
+      "group": "org.postgresql",
+      "name": "postgresql",
+      "version": "42.3.2",
+      "description": "PostgreSQL JDBC driver",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "8fd7a20f008a58b97b26ba5c5084ee61602203aa"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ],
+      "purl": "pkg:maven/org.postgresql/postgresql@42.3.2"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:maven/com.itextpdf/itextpdf@5.5.13",
+      "supplier": {
+        "name": "iText Group NV"
+      },
+      "group": "com.itextpdf",
+      "name": "itextpdf",
+      "version": "5.5.13",
+      "description": "PDF generation library, used for invoices",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "c58c5abc3dcedd5c836b4be8cb210ce63459ee4f"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "AGPL-3.0-only"
+          }
+        }
+      ],
+      "purl": "pkg:maven/com.itextpdf/itextpdf@5.5.13"
+    },
+    {
+      "type": "framework",
+      "bom-ref": "pkg:npm/react@17.0.2",
+      "supplier": {
+        "name": "Meta Platforms, Inc."
+      },
+      "name": "react",
+      "version": "17.0.2",
+      "description": "Library for building user interfaces",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "d0b5cc516d29eb3eee383f75b62864cfb6800037"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "82784fb7be62fddabfcf7ffaabfd1ab0fefc0f4bb9f760f92f5a5deccf0ff9d724e85bbf8c978bea25552b6ddfa6d494663f158dffbeef05c0f1435c94641c6c"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/react@17.0.2"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/react-dom@17.0.2",
+      "supplier": {
+        "name": "Meta Platforms, Inc."
+      },
+      "name": "react-dom",
+      "version": "17.0.2",
+      "description": "React renderer for the DOM",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "ecffb6845e3ad8dbfcdc498f0d0a939736502c23"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "b3887de8ab4b0d4425b04361327d5aafcb766c46beabf600b63f293cf7488cf0c604321536cac3f5a5cd5aab2951ee80cca0881b40b51d964ba8b57baa938118"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/react-dom@17.0.2"
+    },
+    {
+      "type": "framework",
+      "bom-ref": "pkg:npm/express@4.17.1",
+      "supplier": {
+        "name": "OpenJS Foundation"
+      },
+      "name": "express",
+      "version": "4.17.1",
+      "description": "Minimalist web framework for Node.js",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "4491fc38605cf51f8629d39c2b5d026f98a4c134"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "98727d3bbf51aa5ba9851adcc365ff19387793db55bfc61ca326382a487858331460a45952ad21d68d30dabaebc41a8ced5a1e515aa06f6ef19443174e762de2"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/express@4.17.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/lodash@4.17.20",
+      "supplier": {
+        "name": "OpenJS Foundation"
+      },
+      "name": "lodash",
+      "version": "4.17.20",
+      "description": "Utility functions for arrays, objects and strings",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "b44a9b6297bcb698f1c51a3545a2b3b368d59c52"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "3e585d15c8a594e20d7de57b362ea81754c011acb2641a19f1b72c8531ea39825896bab344ae616a0a5a824cb9a381df0b3cddd534645cf305aba70a93dac698"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/lodash@4.17.20"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/jsonwebtoken@8.5.1",
+      "supplier": {
+        "name": "Auth0"
+      },
+      "name": "jsonwebtoken",
+      "version": "8.5.1",
+      "description": "JSON Web Token signing and verification",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "00e71e0b8df54c2121a1f26137df2280673bcc0d"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "5e3c157d14ba8d332ca98b3412cb89e0b1b15d5d78cd0c9b35de0bdabd14bdb567485f407fcc7ba793336c9f74228cfff53238d7f8530afce717f968892ce7f3"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/jsonwebtoken@8.5.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/moment@2.29.1",
+      "name": "moment",
+      "version": "2.29.1",
+      "description": "Date parsing, validation and formatting",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "b2be769fa31940be9eeea6469c075e35006fa3d3"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "9079a8c9b70f57c4aacb9f43c0d0d8dc979fafae252bf6f2fdd6b456215cb80e031f4bd083943a65ee558a6c647d03520be325b3f2b1e77b3b4e33f54611440d"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/moment@2.29.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/minimist@1.2.5",
+      "name": "minimist",
+      "version": "1.2.5",
+      "description": "Command-line argument parser",
+      "scope": "required",
+      "purl": "pkg:npm/minimist@1.2.5"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/ws@7.4.5",
+      "name": "ws",
+      "version": "7.4.5",
+      "description": "WebSocket client and server",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "a484dd851e9beb6fdb420027e3885e8ce48986c1"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "c73caede116fa2645f5ca1fcbce14c5373a0b86ea83af857328df1b06cb7c56131a9a33677105b571b83f7d3bb9b765414cbefb1cb190eac5f80c691aff36bd6"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/ws@7.4.5"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/semver@7.3.8",
+      "supplier": {
+        "name": "npm, Inc."
+      },
+      "name": "semver",
+      "version": "7.3.8",
+      "description": "Semantic version parser",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "ISC"
+          }
+        }
+      ],
+      "purl": "pkg:npm/semver@7.3.8"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40babel/traverse@7.22.0",
+      "group": "@babel",
+      "name": "traverse",
+      "version": "7.22.0",
+      "description": "Babel AST traversal, part of the storefront build toolchain",
+      "scope": "optional",
+      "hashes": [
+        {
+          "alg": "SHA-1",
+          "content": "a8b95473bb6ef3900c66683eafa3ca229e806f09"
+        },
+        {
+          "alg": "SHA-512",
+          "content": "579669de4d27146592202ef3611f0f9df754ea2e95614e099e27dd4923255ccd463288cf01a7a53ec2a628f5b8b564e6a57f4633e4732a5e08a34515707565a7"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:npm/%40babel/traverse@7.22.0"
+    },
+    {
+      "type": "framework",
+      "bom-ref": "pkg:pypi/flask@2.2.2",
+      "supplier": {
+        "name": "Pallets"
+      },
+      "name": "flask",
+      "version": "2.2.2",
+      "description": "WSGI web framework, serves the recommendations service",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "642c450d19c4ad482f96729bd2a8f6d32554aa1e231f4f6b4e7e5264b16cca2b"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/flask@2.2.2"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/jinja2@3.1.2",
+      "supplier": {
+        "name": "Pallets"
+      },
+      "name": "jinja2",
+      "version": "3.1.2",
+      "description": "Template engine",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "31351a702a408a9e7595a8fc6150fc3f43bb6bf7e319770cbc0db9df9437e852"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/jinja2@3.1.2"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/requests@2.31.0",
+      "name": "requests",
+      "version": "2.31.0",
+      "description": "HTTP client library",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "942c5a758f98d790eaed1a29cb6eefc7ffb0d1cf7af05c3d2791656dbd6ad1e1"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/requests@2.31.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/urllib3@1.26.18",
+      "name": "urllib3",
+      "version": "1.26.18",
+      "description": "HTTP client with connection pooling",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "f8ecc1bba5667413457c529ab955bf8c67b45db799d159066261719e328580a0"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/urllib3@1.26.18"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/pyyaml@5.3.1",
+      "name": "pyyaml",
+      "version": "5.3.1",
+      "description": "YAML parser and emitter",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/pyyaml@5.3.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/sqlalchemy@1.4.46",
+      "name": "sqlalchemy",
+      "version": "1.4.46",
+      "description": "SQL toolkit and object-relational mapper",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "6913b8247d8a292ef8315162a51931e2b40ce91681f1b6f18f697045200c4a30"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/sqlalchemy@1.4.46"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/celery@5.2.7",
+      "name": "celery",
+      "version": "5.2.7",
+      "description": "Distributed task queue",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/celery@5.2.7"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/gunicorn@20.1.0",
+      "name": "gunicorn",
+      "version": "20.1.0",
+      "description": "WSGI HTTP server",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "e0a968b5ba15f8a328fdfd7ab1fcb5af4470c28aaf7e55df02a99bc13138e6e8"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/gunicorn@20.1.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:pypi/psycopg2@2.9.3",
+      "name": "psycopg2",
+      "version": "2.9.3",
+      "description": "PostgreSQL database adapter",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "8e841d1bf3434da985cc5ef13e6f75c8981ced601fd70cc6bf33351b91562981"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "LGPL-3.0-or-later"
+          }
+        }
+      ],
+      "purl": "pkg:pypi/psycopg2@2.9.3"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/Newtonsoft.Json@12.0.3",
+      "supplier": {
+        "name": "Newtonsoft"
+      },
+      "name": "Newtonsoft.Json",
+      "version": "12.0.3",
+      "description": "JSON framework for .NET",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "6934665f0479c58bbe996c44f2bf16d435a72f4d92795f0bc1d40cb0bc1358ff0e660ac20b24eabce01ee6145bd553506178e59fbaabd0f2a94b23bfa5c735f5"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:nuget/Newtonsoft.Json@12.0.3"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/System.Text.Encodings.Web@4.7.1",
+      "supplier": {
+        "name": "Microsoft Corporation"
+      },
+      "name": "System.Text.Encodings.Web",
+      "version": "4.7.1",
+      "description": "HTML, JavaScript and URL encoders",
+      "scope": "required",
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "3ceb2d4c5a41c4b8a2a03b3e957954df969a970a73019df82129834c63974c5190ad8700966ba56d7719cbdd664484538c439ba72802c3a655f9ecfb2e0acb66"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:nuget/System.Text.Encodings.Web@4.7.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/Microsoft.Data.SqlClient@2.1.1",
+      "supplier": {
+        "name": "Microsoft Corporation"
+      },
+      "name": "Microsoft.Data.SqlClient",
+      "version": "2.1.1",
+      "description": "SQL Server data provider",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:nuget/Microsoft.Data.SqlClient@2.1.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:nuget/Serilog@2.10.0",
+      "name": "Serilog",
+      "version": "2.10.0",
+      "description": "Structured logging for .NET",
+      "scope": "required",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:nuget/Serilog@2.10.0"
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:generic/demo-storefront@2.4.0",
+      "dependsOn": [
+        "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1",
+        "pkg:maven/org.springframework/spring-webmvc@5.3.17",
+        "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.13.2",
+        "pkg:maven/org.apache.commons/commons-text@1.9",
+        "pkg:maven/com.google.guava/guava@31.1-jre",
+        "pkg:maven/org.slf4j/slf4j-api@1.7.36",
+        "pkg:maven/mysql/mysql-connector-java@8.0.28",
+        "pkg:maven/org.hibernate/hibernate-core@5.6.5.Final",
+        "pkg:maven/org.postgresql/postgresql@42.3.2",
+        "pkg:maven/com.itextpdf/itextpdf@5.5.13",
+        "pkg:npm/react@17.0.2",
+        "pkg:npm/react-dom@17.0.2",
+        "pkg:npm/express@4.17.1",
+        "pkg:npm/lodash@4.17.20",
+        "pkg:npm/jsonwebtoken@8.5.1",
+        "pkg:npm/moment@2.29.1",
+        "pkg:npm/minimist@1.2.5",
+        "pkg:npm/ws@7.4.5",
+        "pkg:npm/semver@7.3.8",
+        "pkg:npm/%40babel/traverse@7.22.0",
+        "pkg:pypi/flask@2.2.2",
+        "pkg:pypi/requests@2.31.0",
+        "pkg:pypi/pyyaml@5.3.1",
+        "pkg:pypi/sqlalchemy@1.4.46",
+        "pkg:pypi/celery@5.2.7",
+        "pkg:pypi/gunicorn@20.1.0",
+        "pkg:pypi/psycopg2@2.9.3",
+        "pkg:nuget/Newtonsoft.Json@12.0.3",
+        "pkg:nuget/System.Text.Encodings.Web@4.7.1",
+        "pkg:nuget/Microsoft.Data.SqlClient@2.1.1",
+        "pkg:nuget/Serilog@2.10.0"
+      ]
+    },
+    {
+      "ref": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1",
+      "dependsOn": [
+        "pkg:maven/org.apache.logging.log4j/log4j-api@2.14.1"
+      ]
+    },
+    {
+      "ref": "pkg:maven/org.apache.logging.log4j/log4j-api@2.14.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:maven/org.springframework/spring-core@5.3.17",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:maven/org.springframework/spring-beans@5.3.17",
+      "dependsOn": [
+        "pkg:maven/org.springframework/spring-core@5.3.17"
+      ]
+    },
+    {
+      "ref": "pkg:maven/org.springframework/spring-webmvc@5.3.17",
+      "dependsOn": [
+        "pkg:maven/org.springframework/spring-beans@5.3.17",
+        "pkg:maven/org.springframework/spring-core@5.3.17"
+      ]
+    },
+    {
+      "ref": "pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.13.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:maven/org.apache.commons/commons-text@1.9",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:maven/com.google.guava/guava@31.1-jre",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:maven/org.slf4j/slf4j-api@1.7.36",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:maven/mysql/mysql-connector-java@8.0.28",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:maven/org.hibernate/hibernate-core@5.6.5.Final",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:maven/org.postgresql/postgresql@42.3.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:maven/com.itextpdf/itextpdf@5.5.13",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/react@17.0.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/react-dom@17.0.2",
+      "dependsOn": [
+        "pkg:npm/react@17.0.2"
+      ]
+    },
+    {
+      "ref": "pkg:npm/express@4.17.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/lodash@4.17.20",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/jsonwebtoken@8.5.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/moment@2.29.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/minimist@1.2.5",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/ws@7.4.5",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/semver@7.3.8",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:npm/%40babel/traverse@7.22.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/flask@2.2.2",
+      "dependsOn": [
+        "pkg:pypi/jinja2@3.1.2"
+      ]
+    },
+    {
+      "ref": "pkg:pypi/jinja2@3.1.2",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/requests@2.31.0",
+      "dependsOn": [
+        "pkg:pypi/urllib3@1.26.18"
+      ]
+    },
+    {
+      "ref": "pkg:pypi/urllib3@1.26.18",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/pyyaml@5.3.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/sqlalchemy@1.4.46",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/celery@5.2.7",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/gunicorn@20.1.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:pypi/psycopg2@2.9.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:nuget/Newtonsoft.Json@12.0.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:nuget/System.Text.Encodings.Web@4.7.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:nuget/Microsoft.Data.SqlClient@2.1.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "pkg:nuget/Serilog@2.10.0",
+      "dependsOn": []
+    }
+  ]
+}
