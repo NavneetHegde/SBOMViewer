@@ -126,11 +126,48 @@ public class PackageExtractorTests
             .Single().Name.Should().Be("@babel/traverse");
     }
 
+    [Theory]
+    [InlineData("pkg:npm/@angular/core@17.0.0", "@angular/core")]        // scope written with a literal "@"
+    [InlineData("pkg:npm/%40angular/core@17.0.0", "@angular/core")]      // ...and percent-encoded
+    [InlineData("pkg:npm/angular/core@17.0.0", "@angular/core")]         // generator dropped the "@"
+    [InlineData("pkg:npm/@angular/core", "@angular/core")]               // no version: the "@" is the scope, not a separator
+    [InlineData("pkg:npm/core@17.0.0", "core")]
+    [InlineData("pkg:maven/org.example/lib@1.0?type=jar&repository_url=https://u@host/repo", "org.example:lib")]
+    [InlineData("pkg:golang/github.com/gin-gonic/gin@v1.9.0#binding", "github.com/gin-gonic/gin")]
+    [InlineData("pkg:pypi/core@1.0", "core")]
+    [InlineData("org.example:core:1.0", "core")]                         // not a purl at all
+    [InlineData(null, "core")]
+    public void OsvName_ReadsTheNamespaceFromThePurl(string? purl, string expected)
+    {
+        PackageExtractor.OsvName("core", purl).Should().Be(expected);
+    }
+
     [Fact]
-    public void OsvName_MatchesBetweenScanPackagesAndComponentRows()
+    public void ExtractPackages_CycloneDX_ScopedNpmPurlWithALiteralAt_StillGetsItsEcosystem()
+    {
+        // The old regex could not match this purl at all, so the package was queried with no
+        // ecosystem and its bare name.
+        using var doc = JsonDocument.Parse("""
+            {
+                "bomFormat": "CycloneDX",
+                "specVersion": "1.6",
+                "components": [
+                    { "group": "@angular", "name": "core", "version": "17.0.0", "purl": "pkg:npm/@angular/core@17.0.0" }
+                ]
+            }
+            """);
+
+        var package = PackageExtractor.ExtractPackages(doc.RootElement, SbomFormat.CycloneDX_1_6).Single();
+
+        package.Name.Should().Be("@angular/core");
+        package.Ecosystem.Should().Be("npm");
+    }
+
+    [Fact]
+    public void OsvName_MatchesBetweenScanPackagesAndComponentRows_CycloneDX()
     {
         // The Components tab joins scan results onto its rows by this name. If the two extractors
-        // ever disagree, every namespaced component silently shows "no vulnerabilities".
+        // ever disagree, the component silently shows "no vulnerabilities".
         using var doc = JsonDocument.Parse("""
             {
                 "bomFormat": "CycloneDX",
@@ -138,17 +175,72 @@ public class PackageExtractorTests
                 "components": [
                     { "group": "org.apache.logging.log4j", "name": "log4j-core", "version": "2.14.1", "purl": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1" },
                     { "group": "@babel", "name": "traverse", "version": "7.22.0", "purl": "pkg:npm/%40babel/traverse@7.22.0" },
+                    { "group": "@angular", "name": "core", "version": "17.0.0", "purl": "pkg:npm/core@17.0.0" },
+                    { "group": "org.example", "name": "lib", "version": "1.0.0", "purl": "pkg:maven/lib@1.0.0" },
                     { "name": "Newtonsoft.Json", "version": "13.0.3", "purl": "pkg:nuget/Newtonsoft.Json@13.0.3" },
                     { "name": "no-purl", "version": "1.0.0" }
                 ]
             }
             """);
 
-        var scanned = PackageExtractor.ExtractPackages(doc.RootElement, SbomFormat.CycloneDX_1_6).Select(p => p.Name);
-        var rowKeys = ComponentRowExtractor.Extract(doc.RootElement, SbomFormat.CycloneDX_1_6)
-            .Select(r => PackageExtractor.OsvName(r.Name, r.Purl));
+        var scanned = PackageExtractor.ExtractPackages(doc.RootElement, SbomFormat.CycloneDX_1_6).Select(p => p.Name).ToList();
+        var rows = ComponentRowExtractor.Extract(doc.RootElement, SbomFormat.CycloneDX_1_6);
 
-        rowKeys.Should().Equal(scanned);
+        rows.Select(r => r.OsvName).Should().Equal(scanned);
+
+        // The name came only from "group" here — the purl has no namespace.
+        scanned[2].Should().Be("@angular/core");
+        scanned[3].Should().Be("org.example:lib");
+
+        // The display name is untouched.
+        rows.Select(r => r.Name).Should().Equal("log4j-core", "traverse", "core", "lib", "Newtonsoft.Json", "no-purl");
+    }
+
+    [Fact]
+    public void OsvName_MatchesBetweenScanPackagesAndComponentRows_Spdx()
+    {
+        // A package may list several PACKAGE-MANAGER references and only one of them is a purl.
+        // Both extractors must pick that one, whatever order they come in.
+        using var doc2 = JsonDocument.Parse("""
+            {
+                "spdxVersion": "SPDX-2.3",
+                "packages": [
+                    {
+                        "name": "log4j-core", "versionInfo": "2.14.1",
+                        "externalRefs": [
+                            { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "maven-central", "referenceLocator": "org.apache.logging.log4j:log4j-core:2.14.1" },
+                            { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1" }
+                        ]
+                    },
+                    {
+                        "name": "only-maven-central", "versionInfo": "1.0.0",
+                        "externalRefs": [
+                            { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "maven-central", "referenceLocator": "org.example:only-maven-central:1.0.0" }
+                        ]
+                    }
+                ]
+            }
+            """);
+        using var doc3 = JsonDocument.Parse("""
+            {
+                "@graph": [
+                    { "type": "software_Package", "name": "traverse", "software_packageVersion": "7.22.0", "software_packageUrl": "pkg:npm/%40babel/traverse@7.22.0" }
+                ]
+            }
+            """);
+
+        var rows2 = ComponentRowExtractor.Extract(doc2.RootElement, SbomFormat.SPDX_2_3);
+        rows2.Select(r => r.OsvName).Should().Equal(
+            PackageExtractor.ExtractPackages(doc2.RootElement, SbomFormat.SPDX_2_3).Select(p => p.Name));
+        rows2[0].OsvName.Should().Be("org.apache.logging.log4j:log4j-core");
+        rows2[0].Purl.Should().Be("pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1");
+
+        // With no purl reference the first package-manager locator is still shown, as before.
+        rows2[1].Purl.Should().Be("org.example:only-maven-central:1.0.0");
+        rows2[1].OsvName.Should().Be("only-maven-central");
+
+        ComponentRowExtractor.Extract(doc3.RootElement, SbomFormat.SPDX_3_0).Select(r => r.OsvName).Should().Equal(
+            PackageExtractor.ExtractPackages(doc3.RootElement, SbomFormat.SPDX_3_0).Select(p => p.Name));
     }
 
     [Fact]

@@ -3,7 +3,6 @@
 @inject SbomCompareState CompareState
 @inject SbomState SbomState
 @inject SbomLoader SbomLoader
-@inject ChatState ChatState
 @inject RecentSbomStore RecentStore
 @inject NavigationManager Nav
 @using SBOMViewer.Blazor.Models
@@ -250,7 +249,6 @@
         var result = SbomLoader.Load(document.RootElement.GetRawText(), fileName ?? "sbom.json");
         if (!result.Success) return;
 
-        ChatState.ClearVulnerabilities();
         SbomState.Load(result, isSample);
 
         Nav.NavigateTo("");

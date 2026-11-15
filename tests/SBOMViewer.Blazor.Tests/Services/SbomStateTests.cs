@@ -86,6 +86,50 @@ public class SbomStateTests
         state.FileName.Should().Be("mine.json");
     }
 
+    private static ChatState ChatWithScanResults()
+    {
+        var chat = new ChatState();
+        chat.VulnResults = [new VulnerabilityResult("old-package", "1.0.0", [])];
+        return chat;
+    }
+
+    [Fact]
+    public void Load_ClearsThePreviousDocumentsScanResults()
+    {
+        // No caller has to remember to do this: results that describe the old document must not
+        // be shown against the new one.
+        var chat = ChatWithScanResults();
+        var state = new SbomState(chat);
+
+        state.Load(LoadResult());
+
+        chat.VulnResults.Should().BeNull();
+    }
+
+    [Fact]
+    public void Load_AFailedResult_LeavesScanResultsAlone()
+    {
+        var chat = ChatWithScanResults();
+        var state = new SbomState(chat);
+
+        state.Load(SbomLoadResult.Failed("boom"));
+
+        chat.VulnResults.Should().NotBeNull();
+    }
+
+    [Fact]
+    public void Clear_ClearsScanResults()
+    {
+        var chat = ChatWithScanResults();
+        var state = new SbomState(chat);
+        state.Load(LoadResult());
+        chat.VulnResults = [new VulnerabilityResult("old-package", "1.0.0", [])];
+
+        state.Clear();
+
+        chat.VulnResults.Should().BeNull();
+    }
+
     [Fact]
     public void Load_IgnoresAFailedResult()
     {

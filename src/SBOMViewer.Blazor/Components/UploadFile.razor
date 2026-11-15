@@ -2,7 +2,6 @@
 @using SBOMViewer.Blazor.Models
 @inject SbomState SbomState
 @inject SbomLoader SbomLoader
-@inject ChatState ChatState
 @inject RecentSbomStore RecentStore
 @inject NavigationManager Nav
 @inject HttpClient Http
@@ -141,11 +140,7 @@
 
     private async Task RefreshRecent() => _recent = await RecentStore.ListAsync();
 
-    private void Show(SbomLoadResult result, bool isSample = false)
-    {
-        ChatState.ClearVulnerabilities();
-        SbomState.Load(result, isSample);
-    }
+    private void Show(SbomLoadResult result, bool isSample = false) => SbomState.Load(result, isSample);
 
     private async Task LoadSample()
     {
@@ -170,15 +165,21 @@
 
             Show(result, isSample: true);
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
-        {
-            _errorMessage = "Couldn't load the sample. Check your connection and try again.";
-        }
-        catch (Exception)
+        catch (Exception ex)
         {
             // Deliberately broad. On the deep-link path this runs inside OnInitializedAsync, where
             // anything that escapes takes the whole page down to the Blazor error UI.
-            _errorMessage = "Couldn't load the sample. Please try again.";
+            if (ex is HttpRequestException or TaskCanceledException)
+            {
+                _errorMessage = "Couldn't load the sample. Check your connection and try again.";
+            }
+            else
+            {
+                // Not a network problem, so retrying will not help — say so, and leave the detail
+                // in the browser console where it can be diagnosed.
+                Console.Error.WriteLine($"Sample load failed: {ex}");
+                _errorMessage = "Couldn't load the sample — something went wrong opening it.";
+            }
         }
         finally
         {
@@ -238,7 +239,6 @@
         _isLoading = true;
         _errorMessage = null;
         _dragCounter = 0;
-        ChatState.ClearVulnerabilities();
         StateHasChanged();
 
         try
