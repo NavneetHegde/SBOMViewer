@@ -136,6 +136,13 @@ jobs:
           BRANCH="${GITHUB_REF_NAME}"
           VERSION="${{ steps.version.outputs.version }}"
           OLD="${{ steps.version.outputs.old }}"
+
+          EXISTING=$(gh pr list --base main --head "$BRANCH" --state open --json number --jq '.[0].number')
+          if [ -n "$EXISTING" ]; then
+            echo "::notice::Release PR #$EXISTING is already open for $BRANCH — it now includes v${VERSION}"
+            exit 0
+          fi
+
           gh pr create \
             --base main \
             --head "$BRANCH" \
@@ -149,4 +156,4 @@ jobs:
           - All Playwright E2E tests passed against staging build
 
           **Merge this PR to deploy to production.**" \
-            --label "release" 2>/dev/null || echo "PR already open — skipping creation"
+            --label "release"
