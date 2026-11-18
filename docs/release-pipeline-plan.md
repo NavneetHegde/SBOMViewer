@@ -123,6 +123,7 @@ Guard rails:
 - [x] Remove the `pull_request` trigger and `close_pull_request` job from the production workflow.
 - [x] Remove `2>/dev/null || echo "…skipping"` from the release-creation and PR-creation steps.
 - [ ] In the Azure portal, delete leftover preview environments.
+- [x] Deploy staging to the separate `staging-sbomviewer` app (staging.sbomviewer.com) with `AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING`, instead of a named `staging` environment inside the production app.
 
 ### Phase 1 — Catch failures before merge
 
@@ -134,7 +135,7 @@ Guard rails:
 
 - [ ] Create `staging` and `production` GitHub Environments. `production`: required reviewer, deployments restricted to `main`.
 - [ ] Move the Azure deploy token from a repository secret to environment secrets.
-- [ ] Decide whether staging gets its own Static Web App (see open decisions).
+- [x] Staging has its own Static Web App — `staging-sbomviewer`, done in phase 0.
 
 ### Phase 3 — Single pipeline
 
@@ -168,7 +169,7 @@ Guard rails:
 
 ## Open decisions
 
-1. **Separate Static Web App for staging?** Staging is currently a named environment inside the production app, so one deploy token can write to both. A separate free-tier app gives the `staging` job a token that cannot touch production. Recommended before phase 5; optional before that. An unused `AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING` secret suggests this existed once.
+1. ~~**Separate Static Web App for staging?**~~ Resolved: `staging-sbomviewer` already exists behind staging.sbomviewer.com. It had been fed by the legacy yellow-coast workflow, which never succeeded; phase 0 points `release-staging.yml` at it.
 2. **Direct pushes to `main` for docs.** `README` edits currently go straight to `main` through admin bypass. Removing the bypass means a PR for every docs change. Recommended: keep the bypass until phase 5, then narrow it.
 3. **PRs opened by workflows do not trigger CI** when created with the default `GITHUB_TOKEN`. This affects the revert PR in phase 4. Options: have `rollback.yml` dispatch `ci.yml` explicitly on the revert branch, or use a GitHub App token. To be settled while building phase 4.
 
