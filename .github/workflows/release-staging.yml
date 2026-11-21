@@ -130,9 +130,12 @@ jobs:
           output_location: ""
           skip_app_build: true
 
+      # The PAT, not GITHUB_TOKEN: the repo does not allow Actions to create PRs
+      # (that setting would also let Actions approve them), and a PR opened with
+      # GITHUB_TOKEN would not trigger CI on itself.
       - name: Create PR to main
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_PAT_SBOM }}
         run: |
           BRANCH="${GITHUB_REF_NAME}"
           VERSION="${{ steps.version.outputs.version }}"
