@@ -55,6 +55,7 @@ SBOMViewer.slnx
 │   ├── ci.yml                          # PR validation: build + unit tests + E2E (required check)
 │   ├── release.yml                     # Push to main: build once → staging → approve → production → tag + release
 │   ├── smoke.yml                       # Reusable: Smoke-category E2E tests against a deployed site
+│   ├── rollback.yml                    # Manual: redeploy a previous release's zip, then push a revert branch
 │   └── deploy-bicep.yml                # Infrastructure deployment
 ├── docs/                               # Design docs and plans
 ├── samples/                            # Sample SBOM JSON files for testing
@@ -274,7 +275,8 @@ Uses **Microsoft.FluentUI.AspNetCore.Components** (v4.13.2) for all UI component
 |----------|---------|--------------|
 | `ci.yml` | PR to `main` | Build, unit tests, Playwright E2E (skipped for docs-only changes); required check `build-and-test` |
 | `release.yml` | Push to `main` | Compute version → build once → staging → smoke → **approval** → production → smoke → tag, GitHub release with the site zip attached |
-| `smoke.yml` | Called by `release.yml`; manual | `Smoke`-category E2E tests against a URL, with `EXPECTED_VERSION` |
+| `smoke.yml` | Called by `release.yml` and `rollback.yml`; manual | `Smoke`-category E2E tests against a URL, with `EXPECTED_VERSION` |
+| `rollback.yml` | Manual (`gh workflow run rollback.yml --ref main`) | **Approval** → redeploy a previous release's attached zip (no rebuild) → smoke → push `revert/vX` with one revert commit and open an issue linking to "create the PR". See `docs/runbook-rollback.md` |
 | `deploy-bicep.yml` | Change to `Infra/main.bicep` | Deploy Azure infrastructure |
 
 Deploy jobs declare a GitHub Environment — `staging` (staging-sbomviewer app, staging.sbomviewer.com) or `production` (app-sbomviewer-eastus-001, sbomviewer.com; accepts `main` only, **required reviewer**). Each environment holds its own `AZURE_STATIC_WEB_APPS_API_TOKEN`, so a job gets the token of the environment it declares. The production approval is the release decision; rejecting it ends the run with no tag. Runs are serialized (`concurrency: release`), so a merge made while a run awaits approval queues behind it.

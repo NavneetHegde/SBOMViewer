@@ -1,0 +1,200 @@
+name: Rollback — Redeploy a Previous Release
+
+# Puts a previous release's exact files back on sbomviewer.com, then prepares
+# a revert of the bad code on main. See docs/runbook-rollback.md.
+#
+#   resolve -> [approve: production environment] -> deploy that release's zip -> smoke
+#           -> push revert branch + open an issue with a one-click "create PR" link
+#
+# Nothing is rebuilt: the zip attached to the GitHub release is what production
+# ran at the time. No tag is created or moved. Running it with the latest
+# version redeploys that version and skips the revert (useful for rehearsals).
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to put back in production, e.g. 3.2.11. Empty = the release before the latest.
+        required: false
+        default: ''
+
+# Shares the release queue: a rollback never races a release.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      target: ${{ steps.resolve.outputs.target }}
+      bad: ${{ steps.resolve.outputs.bad }}
+      revert: ${{ steps.resolve.outputs.revert }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Resolve target and current release
+        id: resolve
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "::error::Run the rollback from main (the production environment only accepts main)"; exit 1
+          fi
+
+          BAD=$(gh release view --json tagName --jq .tagName | sed 's/^v//')
+          TARGET="${{ inputs.version }}"
+          TARGET="${TARGET#v}"
+          if [ -z "$TARGET" ]; then
+            TARGET=$(gh release list --exclude-drafts --exclude-pre-releases --limit 2 --json tagName --jq '.[1].tagName' | sed 's/^v//')
+          fi
+          if [ -z "$TARGET" ]; then echo "::error::No previous release to roll back to"; exit 1; fi
+
+          ZIP="sbomviewer-${TARGET}.zip"
+          if ! gh release view "v${TARGET}" --json assets --jq '.assets[].name' | grep -qx "$ZIP"; then
+            echo "::error::Release v${TARGET} has no ${ZIP}. Only releases made by release.yml (v3.2.11 and later) can be rolled back to."
+            exit 1
+          fi
+
+          # Revert only when going back to an older version than the live one.
+          if [ "$TARGET" = "$BAD" ]; then
+            REVERT=false
+          elif [ "$(printf '%s\n%s\n' "$TARGET" "$BAD" | sort -V | head -1)" = "$TARGET" ]; then
+            REVERT=true
+          else
+            echo "::error::v${TARGET} is newer than the latest release v${BAD}"; exit 1
+          fi
+
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "bad=$BAD" >> "$GITHUB_OUTPUT"
+          echo "revert=$REVERT" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Rollback plan"
+            echo "- Live (latest release): **v${BAD}**"
+            echo "- Will deploy: **v${TARGET}** from \`${ZIP}\`"
+            echo "- Revert branch on main: **${REVERT}**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Waits for approval on the production environment, like a release.
+  deploy:
+    needs: resolve
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://sbomviewer.com
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TARGET: ${{ needs.resolve.outputs.target }}
+    steps:
+      - name: Download the release's site zip
+        run: |
+          gh release download "v${TARGET}" --pattern "sbomviewer-${TARGET}.zip"
+          mkdir site && unzip -q "sbomviewer-${TARGET}.zip" -d site
+          test -f "site/sbomviewer_${TARGET}.json" || { echo "::error::Zip does not contain sbomviewer_${TARGET}.json"; exit 1; }
+
+      - uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: "upload"
+          app_location: "site"
+          api_location: ""
+          output_location: ""
+          skip_app_build: true
+
+  smoke:
+    needs: [resolve, deploy]
+    uses: ./.github/workflows/smoke.yml
+    with:
+      base_url: https://sbomviewer.com
+      version: ${{ needs.resolve.outputs.target }}
+      label: rollback
+
+  # Production is already fixed at this point. This step stops the next merge
+  # from shipping the bad code again: it reverts every code commit between the
+  # two tags on a branch, and opens an issue with a link to create the PR.
+  # The PR is opened by a person, so CI runs on it as usual.
+  revert:
+    needs: [resolve, smoke]
+    if: needs.resolve.outputs.revert == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # push the revert branch
+      issues: write     # open the tracking issue
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TARGET: ${{ needs.resolve.outputs.target }}
+      BAD: ${{ needs.resolve.outputs.bad }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Revert the bad release on a branch
+        id: revert
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BRANCH="revert/v${BAD}"
+          git switch -c "$BRANCH"
+
+          # Code commits only, newest first. Docs-only commits never shipped
+          # (release.yml ignores them), so they are left alone.
+          COMMITS=""
+          for c in $(git rev-list --no-merges "v${TARGET}..v${BAD}"); do
+            if git diff-tree --no-commit-id --name-only -r "$c" \
+                 | grep -qvE '^docs/|^README\.md$|^CHANGELOG\.md$|\.txt$'; then
+              COMMITS="$COMMITS $c"
+            fi
+          done
+          if [ -z "$COMMITS" ]; then
+            echo "::notice::No code commits between v${TARGET} and v${BAD}; nothing to revert"
+            echo "pushed=false" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+
+          if ! git revert --no-commit $COMMITS; then
+            git revert --abort || true
+            echo "::error::Automatic revert hit a conflict. Production IS rolled back; revert v${TARGET}..v${BAD} on main by hand."
+            exit 1
+          fi
+
+          # One commit with its own message: one revert to undo later, and no
+          # copied subject lines — a reverted commit's '[skip ci]' would
+          # otherwise suppress CI on the revert PR.
+          LIST=$(for c in $COMMITS; do git log -1 --format='- %h %s' "$c"; done | sed 's/\[skip ci\]//g; s/\[ci skip\]//g')
+          git commit -q -F - <<MSG
+          revert: roll main back from v${BAD} to v${TARGET}
+
+          Production was rolled back to v${TARGET} by rollback.yml.
+          This reverts the code commits shipped in v${BAD}:
+
+          ${LIST}
+          MSG
+          git push origin "$BRANCH"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+          { echo "log<<EOF"; echo "$LIST"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+
+      - name: Open tracking issue
+        if: steps.revert.outputs.pushed == 'true'
+        env:
+          LOG: ${{ steps.revert.outputs.log }}
+          BRANCH: ${{ steps.revert.outputs.branch }}
+        run: |
+          TITLE="Revert v${BAD}"
+          LINK="${{ github.server_url }}/${GH_REPO}/compare/main...${BRANCH}?expand=1&title=$(printf '%s' "$TITLE" | sed 's/ /%20/g')"
+          BODY="Production was rolled back from **v${BAD}** to **v${TARGET}** by [this run](${{ github.server_url }}/${GH_REPO}/actions/runs/${{ github.run_id }}).
+
+          **\`main\` still contains the bad code.** Until the revert merges, the next merge to \`main\` will ship it again.
+
+          **[Create the revert PR](${LINK})** — CI runs on it, and merging it releases a new patch version without the change.
+
+          Reverted on \`${BRANCH}\`:
+          ${LOG}
+
+          To bring the change back later: fix it on a branch that starts by reverting the revert."
+          URL=$(gh issue create --title "Rolled back v${BAD} → v${TARGET}: revert pending" --body "$BODY")
+          echo "### Revert pending: [create the PR](${LINK}) · tracking issue ${URL}" >> "$GITHUB_STEP_SUMMARY"

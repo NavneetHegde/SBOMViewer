@@ -1,6 +1,6 @@
 # Release Pipeline — One Path to Production, With Rollback
 
-> Phase 0 done (v3.2.8). Phase 1 done (v3.2.9). Phase 2 done (v3.2.10). Phase 3 in progress. Written 2026-11-15 after the v3.2.7 release.
+> Phase 0 done (v3.2.8). Phase 1 done (v3.2.9). Phase 2 done (v3.2.10). Phase 3 done (v3.2.11). Phase 4 in progress. Written 2026-11-15 after the v3.2.7 release.
 
 ## Context
 
@@ -145,16 +145,18 @@ Guard rails:
 - [x] New `release.yml` on push to `main`: compute version → build once → upload artifact → staging → smoke → production gate → deploy → smoke → tag → release with zip attached.
 - [x] Concurrency: one release at a time (`group: release`, no cancellation). **Changed from the original idea**: a merge made while a run waits for approval *queues* behind it rather than superseding it — GitHub cannot cancel a waiting run without also being able to cancel an in-flight production deploy. Approve or reject the waiting run and the queued one proceeds; only the newest queued run is kept.
 - [x] Change `Directory.Build.props` to `VersionPrefix` 3.2.0 + `VersionSuffix` local; the pipeline passes `-p:Version`.
-- [ ] Set the `main` ruleset to squash-only, and require `build-and-test` on `main`.
+- [x] Set the `main` ruleset to squash-only, and require `build-and-test` on `main`.
 - [x] Delete `release-staging.yml` and the old production workflow. Add reusable `smoke.yml`.
-- [ ] After the first release through `release.yml`: delete the `release` ruleset and the `RELEASE_PAT_SBOM` secret. Leave old `release/*` branches in place as history.
+- [x] After the first release through `release.yml`: delete the `release` ruleset and the `RELEASE_PAT_SBOM` secret. Leave old `release/*` branches in place as history.
 - [x] Update `CLAUDE.md` and `README.md`: versioning, CI/CD table, branch strategy. (`AGENTS.md` has no release-flow content.)
 
 ### Phase 4 — Rollback
 
-- [ ] `rollback.yml` as described above.
-- [ ] Rehearse it: roll production back one version and forward again, on a day nothing is at stake.
-- [ ] Add a short `docs/runbook-rollback.md`: when to roll back, the one command, what to check after.
+- [x] `rollback.yml`: resolve target (default: the release before the latest) → production approval → deploy that release's zip → smoke → revert branch.
+- [x] Revert as **one commit** with its own message, on `revert/vX`, plus a tracking issue with a "create the PR" link. **Changed from the original idea**: the workflow does not open the PR itself. Actions may not create PRs in this repo (kept that way deliberately), and a PR opened by `GITHUB_TOKEN` would not trigger the required CI. A PR you open does. This settles open decision 3.
+- [x] `docs/runbook-rollback.md`.
+- [ ] Rehearse, part 1 (now): run with `version=3.2.11` (the live version) — exercises approval, zip deploy and smoke; skips the revert.
+- [ ] Rehearse, part 2 (after v3.2.12): roll back to 3.2.11, create and merge the revert PR, confirm v3.2.13 ships without the change.
 
 ### Phase 5 — Agent workflows
 
