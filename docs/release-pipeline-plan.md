@@ -1,6 +1,6 @@
 # Release Pipeline — One Path to Production, With Rollback
 
-> Phase 0 implemented except the Azure portal cleanup. Written 2026-11-15 after the v3.2.7 release.
+> Phase 0 done (v3.2.8). Phase 1 in progress. Written 2026-11-15 after the v3.2.7 release.
 
 ## Context
 
@@ -127,9 +127,10 @@ Guard rails:
 
 ### Phase 1 — Catch failures before merge
 
-- [ ] Add the Playwright steps to `ci.yml` (copy from `release-staging.yml`).
-- [ ] Tag a small subset of E2E tests `[Category("Smoke")]`: page loads, Blazor boots, `/?sample=1` opens the sample, footer shows a version.
-- [ ] Add the CI job as a required status check in the `main` ruleset. Replace `paths-ignore` in `ci.yml` with an in-workflow path check, otherwise docs-only PRs wait forever on a check that never runs.
+- [x] Add the Playwright steps to `ci.yml` (copy from `release-staging.yml`).
+- [x] Tag a small subset of E2E tests `[Category("Smoke")]`: page loads, Blazor boots, `/?sample=1` opens the sample, footer shows a version. Five tests; `EXPECTED_VERSION` makes the footer test assert the exact version, for post-deploy runs.
+- [ ] Add `build-and-test` as a required status check in the `main` and `release` rulesets (after this PR merges).
+- [x] Replace `paths-ignore` in `ci.yml` with an in-workflow path check, otherwise docs-only PRs wait forever on a check that never runs.
 
 ### Phase 2 — Environments
 

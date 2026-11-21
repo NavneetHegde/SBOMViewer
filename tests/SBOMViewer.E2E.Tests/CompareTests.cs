@@ -28,7 +28,7 @@ public class CompareTests : TestBase
         await Expect(Page.Locator(".compare-slot-filled")).ToHaveCountAsync(2, new() { Timeout = 15_000 });
     }
 
-    [Test]
+    [Test, Category("Smoke")]
     public async Task Compare_RouteLoads()
     {
         await GotoCompare();
