@@ -50,7 +50,9 @@
     {
         <DynamicSbomViewer RootElement="@SbomState.Document.RootElement"
                            Schema="@SbomState.Schema"
-                           FileName="@SbomState.FileName" />
+                           FileName="@SbomState.FileName"
+                           AppVersion="@AppVersion"
+                           UserAgent="@_userAgent" />
     }
     else
     {
