@@ -1,6 +1,6 @@
 # Release Pipeline — One Path to Production, With Rollback
 
-> Phase 0 done (v3.2.8). Phase 1 in progress. Written 2026-11-15 after the v3.2.7 release.
+> Phase 0 done (v3.2.8). Phase 1 done (v3.2.9). Phase 2 in progress. Written 2026-11-15 after the v3.2.7 release.
 
 ## Context
 
@@ -129,13 +129,15 @@ Guard rails:
 
 - [x] Add the Playwright steps to `ci.yml` (copy from `release-staging.yml`).
 - [x] Tag a small subset of E2E tests `[Category("Smoke")]`: page loads, Blazor boots, `/?sample=1` opens the sample, footer shows a version. Five tests; `EXPECTED_VERSION` makes the footer test assert the exact version, for post-deploy runs.
-- [ ] Add `build-and-test` as a required status check in the `main` and `release` rulesets (after this PR merges).
+- [x] `build-and-test` is a required status check on the `release` ruleset. **Not on `main` yet**: release PRs into `main` have the `[skip ci]` bump commit as their head, so the check would never report. Add it to `main` in phase 3, when feature PRs target `main` directly.
 - [x] Replace `paths-ignore` in `ci.yml` with an in-workflow path check, otherwise docs-only PRs wait forever on a check that never runs.
 
 ### Phase 2 — Environments
 
-- [ ] Create `staging` and `production` GitHub Environments. `production`: required reviewer, deployments restricted to `main`.
-- [ ] Move the Azure deploy token from a repository secret to environment secrets.
+- [x] Create `staging` (accepts `release/*`, `main`) and `production` (accepts `main` only) GitHub Environments.
+- [ ] Add yourself as required reviewer on `production` — **deferred to phase 3**. In the current flow, merging the release PR already is the production approval; a reviewer now would mean two clicks for one decision.
+- [x] Environment secrets: `AZURE_STATIC_WEB_APPS_API_TOKEN` in each environment holds that environment's app token; jobs declare `environment:`.
+- [ ] Delete the repository-level `AZURE_STATIC_WEB_APPS_API_TOKEN` and `AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING` once a release has gone through on the environment secrets.
 - [x] Staging has its own Static Web App — `staging-sbomviewer`, done in phase 0.
 
 ### Phase 3 — Single pipeline
