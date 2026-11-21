@@ -114,7 +114,7 @@ public class SampleTests : TestBase
         await Expect(Page.Locator(".sample-chip")).ToHaveCountAsync(0);
     }
 
-    [Test]
+    [Test, Category("Smoke")]
     public async Task Sample_DeepLinkOpensTheDashboardAndStripsTheParameter()
     {
         await Page.GotoAsync($"{BaseUrl}/?sample=1");

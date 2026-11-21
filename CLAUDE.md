@@ -32,6 +32,12 @@ pwsh tests/SBOMViewer.E2E.Tests/bin/Release/net10.0/playwright.ps1 install chrom
 dotnet test tests/SBOMViewer.E2E.Tests -c Release --no-build -e BASE_URL=http://localhost:5000
 ```
 
+Smoke subset (five read-only tests, safe against a live site). `EXPECTED_VERSION` makes the footer test assert the exact version:
+
+```bash
+dotnet test tests/SBOMViewer.E2E.Tests -c Release --no-build --filter "TestCategory=Smoke" -e BASE_URL=https://sbomviewer.com -e EXPECTED_VERSION=3.2.8
+```
+
 #### E2E from Visual Studio Test Explorer
 
 The E2E tests never start the app — with nothing listening they all fail in setup with `net::ERR_CONNECTION_REFUSED`. For Test Explorer, start the app first (`dotnet run --project src/SBOMViewer.Blazor`, or F5), then run the tests: `tests/SBOMViewer.E2E.Tests/local.runsettings` sets `BASE_URL=https://localhost:5157` (the dev server). The csproj applies it **only inside Visual Studio** (`BuildingInsideVisualStudio`), so `dotnet test` and CI keep using the `BASE_URL` environment variable. The dev server is slower than the published build (about 9 minutes for the suite versus 4).
@@ -266,7 +272,7 @@ Uses **Microsoft.FluentUI.AspNetCore.Components** (v4.13.2) for all UI component
 
 | Workflow | Trigger | What it does |
 |----------|---------|--------------|
-| `ci.yml` | PR to `main` or `release/*` | Build, unit tests, Playwright E2E |
+| `ci.yml` | PR to `main` or `release/*` | Build, unit tests, Playwright E2E (skipped for docs-only changes); required check `build-and-test` |
 | `release-staging.yml` | Push to `release/*` | Bump patch in `Directory.Build.props`, deploy staging env, run all tests, open PR to `main` |
 | `azure-static-web-apps-sbomviewer.yml` | Push to `main` | Build, unit tests, deploy to production SWA, create GitHub release |
 | `deploy-bicep.yml` | Change to `Infra/main.bicep` | Deploy Azure infrastructure |

@@ -5,11 +5,11 @@ namespace SBOMViewer.E2E.Tests;
 [TestFixture]
 public class HomePageTests : TestBase
 {
-    [Test]
+    [Test, Category("Smoke")]
     public async Task PageTitle_ContainsSbomViewer() =>
         Assert.That(await Page.TitleAsync(), Does.Contain("SBOM Viewer"));
 
-    [Test]
+    [Test, Category("Smoke")]
     public async Task NavBar_DisplaysAppName() =>
         // Home.razor: <div class="nav-logo">SBOM Viewer</div>
         await Expect(Page.Locator(".nav-logo")).ToContainTextAsync("SBOM Viewer");
@@ -50,8 +50,13 @@ public class HomePageTests : TestBase
         await Expect(Page.Locator("button.font-btn.plus")).ToBeVisibleAsync();
     }
 
-    [Test]
-    public async Task Footer_ShowsAppVersion() =>
-        // Home.razor footer: <span>SBOM Viewer v@AppVersion</span>
-        await Expect(Page.Locator(".app-footer")).ToContainTextAsync("v");
+    [Test, Category("Smoke")]
+    public async Task Footer_ShowsAppVersion()
+    {
+        // Home.razor footer: <span>SBOM Viewer v@AppVersion</span>.
+        // A post-deploy smoke run sets EXPECTED_VERSION to prove the new build is the one being served.
+        var expected = Environment.GetEnvironmentVariable("EXPECTED_VERSION");
+        await Expect(Page.Locator(".app-footer"))
+            .ToContainTextAsync(string.IsNullOrEmpty(expected) ? "v" : $"v{expected}");
+    }
 }
