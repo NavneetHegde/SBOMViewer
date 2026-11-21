@@ -76,6 +76,7 @@ SBOMViewer.slnx
 │       │   ├── UploadFile.razor        # File upload screen — delegates parsing to SbomLoader
 │       │   ├── CompareSlot.razor       # One baseline/current dropzone slot used by Compare.razor
 │       │   ├── DynamicSbomViewer.razor # Top-level viewer — FluentCard + FluentAccordion sections + vuln scan
+│       │   ├── QualityTab.razor        # SBOM quality readiness checklist (NTIA 2021 / CISA 2026 profiles)
 │       │   ├── DynamicSection.razor    # Array/object renderer — search, scroll, details/summary
 │       │   └── DynamicObject.razor     # Recursive object renderer — key-value, badges, nested
 │       ├── Services/
@@ -90,6 +91,9 @@ SBOMViewer.slnx
 │       │   ├── PackageExtractor.cs     # Extracts packages from SBOM JSON (CycloneDX + SPDX 2.x/3.0)
 │       │   ├── ComponentRowExtractor.cs # Extracts ComponentRow list (name, version, license, risk) for the Components/Compliance tabs
 │       │   ├── LicenseClassifier.cs    # Classifies a license identifier into a LicenseRisk category
+│       │   ├── QualityFactsExtractor.cs # Per-format extraction of QualityFacts (Present / DeclaredUnknown / Missing / NotExpressible)
+│       │   ├── SbomQualityService.cs   # Pure rule evaluation: QualityFacts + profile → QualityReport
+│       │   ├── QualityReportExporter.cs # QualityReport → JSON for the Quality tab's "Download JSON"
 │       │   └── VulnerabilityService.cs # OSV.dev two-phase scan: batch query + per-vuln detail fetch
 │       ├── Models/
 │       │   ├── SbomFormat.cs           # Enum: CycloneDX_1_5/1_6/1_7, SPDX_2_2/2_3/3_0
@@ -100,6 +104,7 @@ SBOMViewer.slnx
 │       │   ├── PackageInfo.cs          # Package name, version, ecosystem, purl
 │       │   ├── ComponentRow.cs         # Name, Version, Type, License, Purl, Risk — row shown in Components/Compliance tabs
 │       │   ├── LicenseRisk.cs          # Enum: Permissive, WeakCopyleft, StrongCopyleft, Proprietary, Unknown
+│       │   ├── QualityReport.cs        # FactState, ComponentFacts, QualityFacts, QualityProfile, CheckStatus, QualityCheck, QualityReport
 │       │   ├── VulnerabilityResult.cs  # CVE entries per package
 │       │   └── ChatMessage.cs          # Chat message (role, content, timestamp)
 │       └── wwwroot/
@@ -126,6 +131,9 @@ SBOMViewer.slnx
     │       ├── SbomDiffServiceTests.cs  # purl identity, add/remove/version/license, cross-format, edge cases
     │       ├── SbomCompareStateTests.cs # Two-slot state, diff recomputation, clear/replace
     │       ├── LicenseClassifierTests.cs   # License identifier → LicenseRisk classification tests
+    │       ├── QualityFactsExtractorTests.cs # Per-format facts, NOASSERTION handling, both CycloneDX tools shapes, fixtures
+    │       ├── SbomQualityServiceTests.cs  # Pass/Partial/Fail thresholds, NotExpressible, zero components, profiles, real-generator fixtures
+    │       ├── QualityReportExporterTests.cs # JSON shape per check scope, uncapped affected lists, download file names
     │       └── VulnerabilityServiceTests.cs # OSV.dev API client tests
     └── SBOMViewer.E2E.Tests/
         ├── PlaywrightSetup.cs          # One-time Chromium install ([SetUpFixture])
@@ -134,7 +142,8 @@ SBOMViewer.slnx
         ├── FileUploadTests.cs          # Upload tests: CycloneDX 1.5/1.6/1.7, SPDX 2.2/2.3/3.0.1, unsupported, invalid JSON, search
         ├── CompareTests.cs             # /compare route, two-slot upload, identical files, cross-format diff, swap, reset
         ├── RecentSbomTests.cs          # IndexedDB persistence, 2-entry cap, dedup, clear, slot shortcut
-        └── SampleTests.cs              # "Try a sample" link, Sample chip, /?sample=1 deep link, recents untouched
+        ├── SampleTests.cs              # "Try a sample" link, Sample chip, /?sample=1 deep link, recents untouched
+        └── QualityTests.cs             # Quality tab: headline, profile switch, expand check, Overview card, JSON download, zero requests
 ```
 
 ## Environment
@@ -148,7 +157,7 @@ SBOMViewer.slnx
 
 ### Versioning
 
-`Directory.Build.props` holds only the release line: `<VersionPrefix>3.2.0</VersionPrefix>` plus `<VersionSuffix>local</VersionSuffix>`, so a local build reports `3.2.0-local`. Edit it by hand only for a minor or major bump. **The patch comes from git tags**: `release.yml` takes the highest `vMAJOR.MINOR.*` tag, adds one, and builds with `-p:Version=…`. Nothing commits a version back to the repo, and the tag is created only after production passes its smoke test — so a tag always means "this went live", always on a `main` commit. Tags are never moved or deleted.
+`Directory.Build.props` holds only the release line: `<VersionPrefix>3.3.0</VersionPrefix>` plus `<VersionSuffix>local</VersionSuffix>`, so a local build reports `3.3.0-local`. Edit it by hand only for a minor or major bump. **The patch comes from git tags**: `release.yml` takes the highest `vMAJOR.MINOR.*` tag, adds one, and builds with `-p:Version=…`. Nothing commits a version back to the repo, and the tag is created only after production passes its smoke test — so a tag always means "this went live", always on a `main` commit. Tags are never moved or deleted.
 
 ### Data Flow
 
@@ -243,6 +252,25 @@ A visitor with no SBOM on disk can open a bundled demo from the landing page ("T
 - **LicenseClassifier** — classifies a license identifier string into a `LicenseRisk` category (Permissive, WeakCopyleft, StrongCopyleft, Proprietary, Unknown) via a curated identifier lookup
 - **DynamicSbomViewer** — Compliance tab shows license risk distribution and a searchable table of flagged (strong-copyleft/unknown) components; an "Export Report" button triggers a hidden `.print-report` section combining vulnerability + license summaries for browser print-to-PDF (via the `sbomPrintReport()` JS function)
 
+### SBOM Quality (readiness check)
+
+The **Quality** tab answers "is this SBOM complete enough to hand over?" — distinct from the Compliance tab, which is about license risk. It checks that fields are **populated**, never that values are correct, and the UI never says "compliant" or "certified". Runs entirely locally; no network requests.
+
+- **Profiles** — `CISA 2026` (default; *2026 Minimum Elements for an SBOM*, v2.1, July 2026 — 16 checks) and `NTIA 2021` (7 checks). The CISA document has **no numbered sections**, so each rule's `Reference` names the category and element (`CISA 2026 · Component Data: Component Producer`). Element lists and mapping decisions are recorded in `docs/feature-enhancements/November26/02-quality-scorecard.md`
+- **QualityFactsExtractor** — format-switched like `ComponentRowExtractor` but separate from it: `ComponentRowExtractor` collapses `NOASSERTION` to `""`, which loses the distinction the scorecard reports. Every fact is a `FactState`:
+  - `Present`; `DeclaredUnknown` (`NOASSERTION`, `NONE`, literal `unknown` — but license `NONE` is Present, since it asserts "no license"); `Missing` (absent or empty); `NotExpressible` (the format has no field — e.g. generation context and signature in SPDX 2.x, SBOM version and signature in SPDX 3.0.1)
+  - CycloneDX `metadata.tools` has **two shapes** (legacy array; 1.5+ object with `components`/`services`). SBOM author is `metadata.authors` only — `metadata.supplier`/`manufacturer` describe the component, not the SBOM author
+  - SPDX tool version comes from the `name-version` convention (`Tool: syft-1.18.0`) — neither SPDX 2.x nor the 3.0.1 `Tool` class has a version field
+  - Unnamed components are kept (with a placeholder label) so "Component name" can fail
+  - CycloneDX `cryptographic-asset` and `file` components are skipped, so the Quality component count can be lower than the Components tab's. An algorithm has no supplier, version or hash in the CISA sense; a `file` is the counterpart of an SPDX File, and the SPDX extractors count packages only (syft writes the same workflow files both ways)
+  - SPDX 3.0.1 package hash also follows `hasDistributionArtifact` to the file's `verifiedUsing` — converters from 2.x move the package checksum there, leaving only a `PackageVerificationCode` on the package
+- **SbomQualityService** — static and pure. A profile is a list of `Rule`s (fact selector, reference, fix hint); adding BSI TR-03183-2 is a new list. Component checks: **Pass at 100%, Fail at 0% (or zero components), Partial in between** — no invented pass mark. `NotExpressible` checks are excluded from `Applicable`. Declared unknowns are counted as affected but reported separately. Coverage is a labelled heuristic: it shows components that appear in a relationship, not that transitive dependencies are complete
+- **UI** — `QualityTab.razor` is presentational (takes the `QualityReport` + `OnProfileChanged`). `DynamicSbomViewer` owns the facts and report, because the sidebar count (`10/14`), the Overview "Quality" card (fifth card, `.stats-grid-5`) and the `.print-report` Quality section all use the same result. Profile changes re-evaluate only; facts are extracted once per `JsonDocument`. Affected-component lists are uncapped in the model and capped at `QualityTab.AffectedCap` (200) when rendered, with a filter box
+- **Never on the load path.** `BuildQuality()` (called from `OnParametersSet`) only resets state on a new document. At or under `DynamicSbomViewer.QualityAutoRunLimit` (2,000) components the check is queued for `OnAfterRenderAsync`, after the dashboard has painted; above it the tab shows "Run readiness check" and waits for a click — WebAssembly is single-threaded, so the pause should be one the user chose. `RunQualityAsync` yields with `Task.Delay(1)` so the spinner paints, and discards its result if the document was replaced meanwhile. Measured: 5,000 components ≈ 870 ms in the published build; `QualityTests.LargeSbom_WaitsForAClick_ThenRuns` logs `QUALITY-PERF` for re-measuring. Export before the check has run prints "not run" rather than computing it
+- **Real-generator fixtures are local-only.** cdxgen, syft, trivy, sbom-tool and spdx-maven-plugin output lives in a developer's `samples/` folder (listed in `.git/info/exclude`, not committed). Their tests in `SbomQualityServiceTests` use `[LocalSampleFact("file")]` / `[LocalSampleTheory]` (`TestData/LocalSampleFactAttribute.cs`), which skip when the file is absent, so CI stays green. Every behaviour those files uncovered also has an inline test in `QualityFactsExtractorTests`
+- **Download JSON.** The Quality toolbar's button saves the selected profile's report via `QualityReportExporter` and the existing `sbomDownloadFile` helper, as `<stem>.quality-<cisa-2026|ntia-2021>.json`. It contains every check, summary counts, the disclaimer and the **full, uncapped** affected-component lists, plus the source file name. That is fine because it is saved locally. Written with `Utf8JsonWriter`, not reflection; `schemaVersion` is bumped when a field is renamed or removed. File-name sanitising uses a fixed Windows-safe character set and splits on both `/` and `\`, because `Path` in WebAssembly behaves as on Linux
+- **Beta + "Report a wrong result".** The tab, Overview card and print heading carry a Beta label. Each check links to `FeedbackLink.ForQualityCheck`, a pre-filled GitHub issue naming the profile, check id, element reference and counts and asking which tool generated the SBOM — **never the file name or component names** (an internal package name can be as revealing as a file name). `Home.razor` passes `AppVersion` and the user agent down for the prefill
+
 ### Key Models
 
 - `SchemaNode` — lightweight tree built from JSON data: `PropertyName`, `Title`, `NodeType`, `Properties` dict, `PropertyOrder`, `ItemSchema` (for arrays), `RenderHint`
@@ -254,6 +282,7 @@ A visitor with no SBOM on disk can open a bundled demo from the landing page ("T
 - `PackageInfo` record — Name, Version, Ecosystem, Purl
 - `ComponentRow` record — Name, Version, Type, License, Purl, Risk, plus `OsvName` (the key scan results are looked up by)
 - `LicenseRisk` enum — Permissive, WeakCopyleft, StrongCopyleft, Proprietary, Unknown
+- `QualityFacts` / `ComponentFacts` records — format-neutral `FactState` per field; `QualityReport` — profile + `QualityCheck` list (`Passed`, `Applicable`, `ComponentsWithGap`, `AverageComponentCoverage`)
 - `VulnerabilityResult` record — PackageName, PackageVersion, list of `VulnerabilityEntry`
 - `VulnerabilityEntry` record — Id, Summary, Severity, CvssScore, FixedVersion
 - `ChatMessage` record — Role, Content, Timestamp
@@ -325,7 +354,7 @@ The agent never merges, approves, or deploys. The human gates are: opening the P
 2. Add detection logic in `SbomFormatDetector.DetectWithDetails()` (peek at a distinguishing JSON property)
 3. Add validation logic in `SbomFormatDetector.Validate()` (check required fields)
 4. Update `SbomFormatDetector.SupportedVersions` array
-5. If the new format reuses an existing field layout (e.g. a minor spec revision), just add it to the existing `switch` arm in `PackageExtractor.ExtractPackages()` and `ComponentRowExtractor.Extract()`. If it's a structurally different document model (e.g. SPDX 3.0's JSON-LD `@graph`), add a new extraction method to both
+5. If the new format reuses an existing field layout (e.g. a minor spec revision), just add it to the existing `switch` arm in `PackageExtractor.ExtractPackages()`, `ComponentRowExtractor.Extract()` and `QualityFactsExtractor.Extract()`. If it's a structurally different document model (e.g. SPDX 3.0's JSON-LD `@graph`), add a new extraction method to all three
 6. No new viewer components needed — the dynamic rendering pipeline (`SchemaService`, `DynamicSection`, `DynamicObject`) handles any JSON structure automatically
 
 ## Branch Strategy

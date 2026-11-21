@@ -5,6 +5,7 @@
 @inject ChatState ChatState
 @inject VulnerabilityService VulnService
 @inject SbomState SbomState
+@inject IJSRuntime JS
 
 @* ── Scan overlay ── *@
 @if (ChatState.IsScanning)
@@ -57,6 +58,23 @@
                     <span class="si-count" style="color:var(--crit); background:oklch(60% 0.22 20 / 0.12);">@_totalVulns</span>
                 }
             </button>
+
+            @if (QualityAvailable)
+            {
+                <button class="sidebar-item @(_activeTab == "quality" ? "active" : "")"
+                        @onclick='() => SetTab("quality")'>
+                    <span class="si-icon">☑</span>
+                    <span class="si-label">Quality</span>
+                    @if (_qualityReport is not null)
+                    {
+                        <span class="si-count" title="@_qualityReport.ProfileLabel checks passed">@_qualityReport.Passed/@_qualityReport.Applicable</span>
+                    }
+                    else if (_qualityRunning)
+                    {
+                        <span class="si-count" title="Checking…">…</span>
+                    }
+                </button>
+            }
 
             @if (_componentCount > 0)
             {
@@ -132,6 +150,19 @@
             else if (_activeTab == "compliance")
             {
                 @RenderComplianceTab()
+            }
+            else if (_activeTab == "quality" && QualityAvailable)
+            {
+                @if (_qualityReport is not null)
+                {
+                    <QualityTab Report="@_qualityReport" OnProfileChanged="SetQualityProfile" OnDownload="DownloadQualityJson"
+                                AppVersion="@AppVersion" UserAgent="@UserAgent"
+                                FormatLabel="@SbomFormatLabel.For(SbomState.DetectedFormat)" />
+                }
+                else
+                {
+                    @RenderQualityNotRun()
+                }
             }
             else if (_dynamicSections.TryGetValue(_activeTab, out var dynSec))
             {
@@ -230,6 +261,42 @@
             </table>
         }
 
+        @if (QualityAvailable && _qualityReport is null)
+        {
+            <h2>SBOM Quality (readiness check)</h2>
+            <p>The readiness check has not been run for this SBOM. Open the Quality tab to run it, then export again.</p>
+        }
+        @if (_qualityReport is not null)
+        {
+            var failing = _qualityReport.Checks.Where(c => c.Status is CheckStatus.Fail or CheckStatus.Partial).ToList();
+            <h2>SBOM Quality (readiness check, beta)</h2>
+            <p>
+                Profile: @_qualityReport.ProfileLabel — @_qualityReport.Passed of @_qualityReport.Applicable checks pass.
+                @_qualityReport.ComponentsWithGap of @_qualityReport.ComponentCount components have at least one gap.
+            </p>
+            @if (failing.Count == 0)
+            {
+                <p>All applicable checks pass.</p>
+            }
+            else
+            {
+                <table class="print-table">
+                    <thead><tr><th>Check</th><th>Element</th><th>Status</th><th>Populated</th></tr></thead>
+                    <tbody>
+                        @foreach (var c in failing)
+                        {
+                            <tr>
+                                <td>@c.Title</td>
+                                <td>@c.Reference</td>
+                                <td>@c.Status</td>
+                                <td>@(c.Scope == CheckScope.Component ? $"{c.Satisfied} of {c.Total}" : c.Status == CheckStatus.Partial ? "declared unknown" : "missing")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        }
+
         <h2>License Distribution</h2>
         @if (_licenseDist.Count == 0)
         {
@@ -250,6 +317,8 @@
 
         <p class="print-disclaimer">
             This report is generated automatically from SBOM metadata (CycloneDX or SPDX) and the OSV.dev vulnerability database.
+            The quality section checks only that fields are populated, not that their values are correct, and is not a
+            compliance determination.
             License risk categories are derived from a curated license-identifier lookup and may not reflect a complete
             or compatible license analysis (e.g. compound license expressions, custom license text). This report is
             provided for informational purposes only, does not constitute legal advice, and should not be relied upon
@@ -262,6 +331,9 @@
     [Parameter] public JsonElement RootElement { get; set; }
     [Parameter] public SchemaNode Schema { get; set; } = default!;
     [Parameter] public string? FileName { get; set; }
+    /// <summary>For the Quality tab's "report a wrong result" prefill only.</summary>
+    [Parameter] public string? AppVersion { get; set; }
+    [Parameter] public string? UserAgent { get; set; }
 
     private string _activeTab = "overview";
 
@@ -297,6 +369,24 @@
     // Compliance tab state
     private string       _complianceSearch    = "";
     private LicenseRisk? _complianceRiskFilter = null;
+
+    // Quality tab state. Facts are extracted once per document; switching profile only re-evaluates.
+    private QualityFacts?   _qualityFacts;
+    private QualityReport?  _qualityReport;
+    private QualityProfile  _qualityProfile = QualityProfile.Cisa2026;
+    private JsonDocument?   _qualityDoc;
+    private bool            _qualityRunning;
+    private bool            _qualityAutoQueued;
+
+    /// <summary>
+    /// Above this many components the readiness check waits for a click instead of running after load.
+    /// Measured in the published build (Chromium, desktop): 5,000 components check in ~870 ms, so the
+    /// automatic pause at this limit is roughly 350 ms. Re-measure with <c>QualityTests.LargeSbom_*</c>
+    /// (it logs QUALITY-PERF) before raising it; slower devices pay several times that.
+    /// </summary>
+    public const int QualityAutoRunLimit = 2000;
+
+    private bool QualityAvailable => SbomState.DetectedFormat is not null && RootElement.ValueKind == JsonValueKind.Object;
 
     // Dynamic sidebar sections
     private Dictionary<string, DynSection> _dynamicSections = [];
@@ -352,6 +442,101 @@
         _generatedDate = ExtractGeneratedDate();
         BuildDynamicSections();
         UpdateVulnStats();
+        BuildQuality();
+    }
+
+    /// <summary>
+    /// Called from OnParametersSet, so it must stay cheap: it never runs the check itself. On a new document it
+    /// clears the previous result and, for an SBOM at or under <see cref="QualityAutoRunLimit"/> components,
+    /// schedules the check for after the dashboard has painted (<see cref="OnAfterRenderAsync"/>). Above the
+    /// limit the check waits for the user to ask — WebAssembly is single-threaded, so the page pauses while
+    /// it runs, and that pause should be one the user chose rather than part of every upload.
+    /// </summary>
+    private void BuildQuality()
+    {
+        if (ReferenceEquals(SbomState.Document, _qualityDoc)) return;
+
+        _qualityDoc       = SbomState.Document;
+        _qualityFacts     = null;
+        _qualityReport    = null;
+        _qualityRunning   = false;
+        _qualityAutoQueued = QualityAvailable && _componentCount <= QualityAutoRunLimit;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_qualityAutoQueued)
+        {
+            _qualityAutoQueued = false;
+            await RunQualityAsync();
+        }
+    }
+
+    private async Task RunQualityAsync()
+    {
+        if (_qualityRunning || _qualityReport is not null || !QualityAvailable) return;
+
+        var doc = SbomState.Document;
+        _qualityRunning = true;
+        StateHasChanged();
+        // Let the browser paint the "Checking…" state before the synchronous pass blocks the thread.
+        await Task.Delay(1);
+
+        try
+        {
+            // The document can be replaced while we yielded; drop the result rather than show a stale one.
+            if (!ReferenceEquals(doc, SbomState.Document)) return;
+            _qualityFacts  = QualityFactsExtractor.Extract(RootElement, SbomState.DetectedFormat);
+            _qualityReport = SbomQualityService.Evaluate(_qualityFacts, _qualityProfile);
+        }
+        finally
+        {
+            _qualityRunning = false;
+            StateHasChanged();
+        }
+    }
+
+    private RenderFragment RenderQualityNotRun() =>
+    @<div class="content fadein" style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%;">
+        @if (_qualityRunning || _qualityAutoQueued)
+        {
+            <div class="scan-running quality-running" style="padding:14px 24px; font-size:14px;">
+                <div class="spinner" style="width:20px; height:20px; border-width:3px;"></div>
+                Checking @_componentCount components…
+            </div>
+        }
+        else
+        {
+            <div class="empty-state">
+                <div class="empty-state-icon">☑</div>
+                <div class="empty-state-title">Readiness check not run yet <span class="beta-chip">Beta</span></div>
+                <div style="max-width:460px; margin:0 auto 20px;">
+                    This SBOM has @_componentCount.ToString("N0") components, so the check runs only when you ask.
+                    The page may pause briefly while it runs.
+                </div>
+                <button class="btn-primary quality-run-btn" style="font-size:13px; padding:8px 20px;" @onclick="RunQualityAsync">
+                    Run readiness check
+                </button>
+                <div style="margin-top:8px; font-size:11px; color:var(--text-dimmer);">
+                    Runs in your browser · nothing is uploaded or sent anywhere
+                </div>
+            </div>
+        }
+    </div>;
+
+    private void SetQualityProfile(QualityProfile profile)
+    {
+        _qualityProfile = profile;
+        _qualityReport  = _qualityFacts is null ? null : SbomQualityService.Evaluate(_qualityFacts, profile);
+    }
+
+    /// <summary>Saves the report for the selected profile. Built and saved in the browser; nothing is sent.</summary>
+    private async Task DownloadQualityJson()
+    {
+        if (_qualityReport is null) return;
+        var json = QualityReportExporter.ToJson(_qualityReport, DateTimeOffset.UtcNow,
+            FileName, SbomFormatLabel.For(SbomState.DetectedFormat), AppVersion);
+        await JS.InvokeVoidAsync("sbomDownloadFile", QualityReportExporter.FileNameFor(FileName, _qualityReport.Profile), json);
     }
 
     private void UpdateVulnStats()
@@ -485,7 +670,7 @@
     private RenderFragment RenderOverviewTab() =>
     @<div class="content fadein">
         @* Stats grid *@
-        <div class="stats-grid">
+        <div class="stats-grid @(QualityAvailable ? "stats-grid-5" : "")">
             <div class="stat-card clickable" @onclick='() => SetTab("components")'>
                 <div class="stat-label">Components</div>
                 <div class="stat-value">@_componentCount</div>
@@ -520,6 +705,29 @@
                 <div class="stat-sub">unique license types</div>
                 <div class="stat-bar"><div class="stat-bar-fill" style="width:@(_componentCount > 0 ? $"{Math.Min(100, _licenseCount * 10)}%" : "0%"); background:var(--info)"></div></div>
             </div>
+            @if (QualityAvailable)
+            {
+                var qPct = _qualityReport is null || _qualityReport.Applicable == 0 ? 0
+                    : Math.Round((double)_qualityReport.Passed / _qualityReport.Applicable * 100);
+                <div class="stat-card clickable quality-stat" @onclick='() => SetTab("quality")'>
+                    <div class="stat-label">Quality <span class="beta-chip">Beta</span></div>
+                    <div class="stat-value">
+                        @if (_qualityReport is not null)
+                        {
+                            @_qualityReport.Passed<span class="quality-of">/@_qualityReport.Applicable</span>
+                        }
+                        else
+                        {
+                            <span style="font-size:16px; font-weight:500; color:var(--text-dimmer)">@(_qualityRunning || _qualityAutoQueued ? "Checking…" : "Not checked")</span>
+                        }
+                    </div>
+                    <div class="stat-sub">
+                        @(_qualityReport is not null ? $"{_qualityReport.ProfileLabel} checks pass"
+                          : _qualityRunning || _qualityAutoQueued ? "readiness check" : "large SBOM — open to run")
+                    </div>
+                    <div class="stat-bar"><div class="stat-bar-fill" style="width:@qPct%; background:var(--accent)"></div></div>
+                </div>
+            }
             <div class="stat-card">
                 <div class="stat-label">Risk Score</div>
                 @{

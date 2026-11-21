@@ -3,8 +3,8 @@
     <!-- Release line. Hand-edit only for a minor or major bump.
          The patch comes from git tags: release.yml finds the highest vMAJOR.MINOR.* tag,
          adds one, and builds with -p:Version=MAJOR.MINOR.PATCH (which overrides both lines below).
-         Local builds report e.g. 3.2.0-local, so a local build is never mistaken for a release. -->
-    <VersionPrefix>3.2.0</VersionPrefix>
+         Local builds report e.g. 3.3.0-local, so a local build is never mistaken for a release. -->
+    <VersionPrefix>3.3.0</VersionPrefix>
     <VersionSuffix>local</VersionSuffix>
   </PropertyGroup>
 </Project>

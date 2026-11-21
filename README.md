@@ -19,6 +19,7 @@ The app includes built-in **vulnerability scanning** powered by [OSV.dev](https:
 - **Dynamic SBOM viewer** — upload any supported SBOM JSON and the UI is generated dynamically from the file structure
 - **Auto-detect format** — automatically identifies CycloneDX or SPDX format and version
 - **Vulnerability scanning** — scan all components against the OSV.dev database for known CVEs, with severity ratings (Critical/High/Medium/Low), CVSS scores, and fix versions
+- **SBOM quality readiness check** *(beta)*: checks whether the SBOM populates the fields in **CISA's 2026 Minimum Elements** (16 checks) or **NTIA 2021** (7 checks). Each check shows Pass, Partial or Fail, with per-component coverage, the components affected and a fix hint. Values such as `NOASSERTION` are reported as "declared unknown", not as missing. Fields a format cannot express (e.g. signatures in SPDX 2.x) are marked as such, not failed. Download the result as JSON. It checks that fields are populated, not that their values are correct, and is not a compliance certification
 - **Searchable sections** — filter components, packages, and vulnerability results
 - **Accordion item counts** — each section shows the number of items as a badge
 - **Fully client-side** — all processing happens in the browser, no data leaves your machine
@@ -75,7 +76,8 @@ For the complete history of changes, see [CHANGELOG.md](./CHANGELOG.md).
 2. Select a `.json` file (max 20 MB) — the format is detected automatically.
 3. The data is parsed and displayed in a structured, searchable view.
 4. Navigate through accordion sections to explore components, dependencies, licenses, and more.
-5. Open the **Vulnerabilities** section and click **Scan for Vulnerabilities** to check all packages against the [OSV.dev](https://osv.dev) database — results show severity ratings, CVE IDs, and available fix versions.
+5. Open the **Quality** tab to see how complete the SBOM is against CISA 2026 or NTIA 2021, and use **Download JSON** to keep the result. SBOMs over 2,000 components wait for you to click **Run readiness check**.
+6. Open the **Vulnerabilities** section and click **Scan for Vulnerabilities** to check all packages against the [OSV.dev](https://osv.dev) database — results show severity ratings, CVE IDs, and available fix versions.
 
 ### Try It Without a File
 

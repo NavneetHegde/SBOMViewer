@@ -1,5 +1,6 @@
 using System.Web;
 using FluentAssertions;
+using SBOMViewer.Blazor.Models;
 using SBOMViewer.Blazor.Services;
 
 namespace SBOMViewer.Blazor.Tests.Services;
@@ -84,5 +85,58 @@ public class FeedbackLinkTests
     {
         BodyOf(FeedbackLink.Build("3.2.5", "CycloneDX 1.6"))
             .Should().Contain("No SBOM contents or file names are included");
+    }
+
+    // ─── Quality check "report a wrong result" ──────────────
+
+    private static (QualityReport Report, QualityCheck Check) QualityHashCheck()
+    {
+        var facts = new QualityFacts
+        {
+            DependencyRelationships = FactState.Present,
+            Components =
+            [
+                new ComponentFacts { Label = "acme-internal-billing@2.0.0", Hash = FactState.Missing },
+                new ComponentFacts { Label = "lodash@4.17.21", Hash = FactState.Present },
+            ]
+        };
+        var report = SbomQualityService.Evaluate(facts, QualityProfile.Cisa2026);
+        return (report, report.Checks.Single(c => c.Id == "hash"));
+    }
+
+    [Fact]
+    public void ForQualityCheck_NamesTheCheckProfileReferenceAndCounts()
+    {
+        var (report, check) = QualityHashCheck();
+        var url = FeedbackLink.ForQualityCheck("3.3.0", "CycloneDX 1.6", "Mozilla/5.0", report, check);
+
+        new Uri(url).Host.Should().Be("github.com");
+        HttpUtility.ParseQueryString(new Uri(url).Query)["title"].Should().Be("Quality check: Component hash (CISA 2026)");
+        var body = BodyOf(url);
+        body.Should().Contain("`hash`");
+        body.Should().Contain("CISA 2026 · Component Data: Component Hash Value / Algorithm");
+        body.Should().Contain("Partial — 1 of 2 components populated");
+        body.Should().Contain("Which tool generated the SBOM?");
+        body.Should().Contain("v3.3.0").And.Contain("CycloneDX 1.6");
+    }
+
+    [Fact]
+    public void ForQualityCheck_NeverIncludesComponentNames()
+    {
+        // An internal package name can identify an unreleased product as surely as a file name.
+        var (report, check) = QualityHashCheck();
+        check.AffectedComponents.Should().Contain("acme-internal-billing@2.0.0");
+
+        FeedbackLink.ForQualityCheck("3.3.0", "CycloneDX 1.6", null, report, check)
+            .Should().NotContain("acme").And.NotContain("lodash");
+    }
+
+    [Fact]
+    public void ForQualityCheck_DocumentCheck_DescribesStateNotCounts()
+    {
+        var report = SbomQualityService.Evaluate(new QualityFacts(), QualityProfile.Cisa2026);
+        var check = report.Checks.Single(c => c.Id == "author");
+
+        BodyOf(FeedbackLink.ForQualityCheck("3.3.0", null, null, report, check)).Should().Contain("Fail — missing");
     }
 }

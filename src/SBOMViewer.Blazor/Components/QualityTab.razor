@@ -1,0 +1,209 @@
+@using SBOMViewer.Blazor.Models
+@using SBOMViewer.Blazor.Services
+
+@* Quality tab — readiness check of the open SBOM against a selectable profile.
+   Presentational: DynamicSbomViewer extracts the facts once and evaluates the report, because the
+   Overview card and the print report need the same result. Everything here is local; nothing is sent. *@
+
+<div class="quality-tab fadein" style="display:flex; flex-direction:column; height:100%; overflow:hidden;">
+    <div class="toolbar">
+        @foreach (var p in SbomQualityService.Profiles)
+        {
+            var profile = p;
+            <button class="filter-btn @(Report.Profile == profile ? "active" : "")"
+                    data-profile="@profile"
+                    @onclick="() => SelectProfile(profile)">
+                @ProfileLabel(profile)
+            </button>
+        }
+        <div class="search-box">
+            <span class="search-icon">⌕</span>
+            <input placeholder="Filter affected components…" value="@_search"
+                   @oninput="e => _search = e.Value?.ToString() ?? string.Empty" />
+        </div>
+        <div class="toolbar-right">
+            <span class="count-label" title="The readiness check runs in your browser and makes no network requests">
+                Runs locally · nothing leaves the browser
+            </span>
+            @if (OnDownload.HasDelegate)
+            {
+                <button class="btn-ghost quality-download-btn" @onclick="() => OnDownload.InvokeAsync()"
+                        title="Save this @Report.ProfileLabel result as JSON, with every check and the full list of affected components. Saved in your browser; nothing is uploaded.">
+                    ⤓ Download JSON
+                </button>
+            }
+        </div>
+    </div>
+
+    <div class="content" style="overflow-y:auto;">
+        <div class="quality-headline">
+            <span class="quality-headline-count">@Report.Passed of @Report.Applicable</span>
+            checks pass against @Report.ProfileLabel
+            <span class="beta-chip" title="New feature — results may be wrong for some generators. Use “Report a wrong result” on any check.">Beta</span>
+        </div>
+
+        @{
+            var docChecks  = Report.Checks.Where(c => c.Scope == CheckScope.Document && c.Status != CheckStatus.NotExpressible).ToList();
+            var docPassed  = docChecks.Count(c => c.Status == CheckStatus.Pass);
+            var avg        = Report.AverageComponentCoverage;
+            var notExpr    = Report.Checks.Count(c => c.Status == CheckStatus.NotExpressible);
+        }
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Checks passed</div>
+                <div class="stat-value">@Report.Passed<span class="quality-of">/@Report.Applicable</span></div>
+                <div class="stat-sub">@(notExpr > 0 ? $"{notExpr} not expressible in this format" : "all checks apply to this format")</div>
+                <div class="stat-bar"><div class="stat-bar-fill" style="width:@Pct(Report.Passed, Report.Applicable)%; background:var(--accent)"></div></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Document fields</div>
+                <div class="stat-value">@docPassed<span class="quality-of">/@docChecks.Count</span></div>
+                <div class="stat-sub">author, timestamp, tool…</div>
+                <div class="stat-bar"><div class="stat-bar-fill" style="width:@Pct(docPassed, docChecks.Count)%; background:var(--info)"></div></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Component coverage</div>
+                <div class="stat-value">@(avg is null ? "—" : $"{avg:0.#}%")</div>
+                <div class="stat-sub">average across component checks</div>
+                <div class="stat-bar"><div class="stat-bar-fill" style="width:@(avg ?? 0)%; background:var(--low)"></div></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Components with a gap</div>
+                <div class="stat-value" style="color:@(Report.ComponentsWithGap > 0 ? "var(--med)" : "var(--text)")">@Report.ComponentsWithGap</div>
+                <div class="stat-sub">of @Report.ComponentCount components</div>
+                <div class="stat-bar"><div class="stat-bar-fill" style="width:@Pct(Report.ComponentsWithGap, Report.ComponentCount)%; background:var(--med)"></div></div>
+            </div>
+        </div>
+
+        <div class="compliance-disclaimer">
+            ⓘ This readiness check reports whether the fields each element asks for are populated. It does not check
+            that the values are correct (that a hash matches, a supplier is real, a license is accurate) and it is not a
+            compliance determination or certification. This check is in beta: generators map these fields differently,
+            so if a result looks wrong for your file, use “Report a wrong result” on that check. Element names follow
+            @(Report.Profile == QualityProfile.Cisa2026
+                ? "CISA's 2026 Minimum Elements for an SBOM (v2.1, July 2026)"
+                : "NTIA's Minimum Elements for an SBOM (July 2021)").
+        </div>
+
+        <div class="quality-list">
+            @foreach (var check in Report.Checks)
+            {
+                var c = check;
+                var (cls, icon, label) = StatusDisplay(c.Status);
+                <details class="quality-check @cls" data-check="@c.Id">
+                    <summary>
+                        @* The glyph alone (✓ ◐ ✕) reads as "check mark" or nothing; screen readers get the word. *@
+                        <span class="quality-status-icon" title="@label" aria-hidden="true">@icon</span>
+                        <span class="sr-only">@label:</span>
+                        <span class="quality-check-main">
+                            <span class="quality-check-title">@c.Title</span>
+                            <span class="quality-check-ref">@c.Reference</span>
+                        </span>
+                        <span class="quality-check-meter">
+                            @if (c.Status == CheckStatus.NotExpressible)
+                            {
+                                <span class="quality-check-count">not expressible in this format</span>
+                            }
+                            else if (c.Scope == CheckScope.Component)
+                            {
+                                <span class="stat-bar quality-bar"><span class="stat-bar-fill" style="display:block; width:@c.CoveragePct%; background:@BarColor(c.Status)"></span></span>
+                                <span class="quality-check-count">
+                                    @(c.Total == 0 ? "no components" : $"{c.Satisfied} of {c.Total}")
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="quality-check-count">@DocStateText(c)</span>
+                            }
+                        </span>
+                    </summary>
+                    <div class="quality-check-body">
+                        @if (c.Note is not null)
+                        {
+                            <div class="quality-note">ⓘ @c.Note</div>
+                        }
+                        <div class="quality-hint"><strong>How to fix:</strong> @c.FixHint</div>
+                        @if (c.DeclaredUnknown > 0 && c.Scope == CheckScope.Component)
+                        {
+                            <div class="quality-note">
+                                Declared unknown: @c.DeclaredUnknown · Missing: @(c.Affected - c.DeclaredUnknown).
+                                Declaring a value unknown (for example NOASSERTION) is better than leaving it out, but the
+                                field is still not populated.
+                            </div>
+                        }
+                        @if (c.AffectedComponents.Count > 0)
+                        {
+                            var filtered = string.IsNullOrEmpty(_search)
+                                ? c.AffectedComponents
+                                : c.AffectedComponents.Where(n => n.Contains(_search, StringComparison.OrdinalIgnoreCase)).ToList();
+                            <div class="quality-affected-title">
+                                Affected components (@(string.IsNullOrEmpty(_search) ? $"{c.Affected}" : $"{filtered.Count} of {c.Affected} match"))
+                            </div>
+                            <ul class="quality-affected">
+                                @foreach (var name in filtered.Take(AffectedCap))
+                                {
+                                    <li>@name</li>
+                                }
+                            </ul>
+                            @if (filtered.Count > AffectedCap)
+                            {
+                                <div class="quality-more">and @(filtered.Count - AffectedCap) more — filter to narrow the list</div>
+                            }
+                        }
+                        <a class="quality-report-link" target="_blank" rel="noopener noreferrer"
+                           href="@FeedbackLink.ForQualityCheck(AppVersion, FormatLabel, UserAgent, Report, c)"
+                           title="Opens a pre-filled GitHub issue. It names the check and its counts — never your file name or component names.">
+                            Report a wrong result ↗
+                        </a>
+                    </div>
+                </details>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>Rendered rows per check. A 5,000-component SBOM with no hashes must not render 5,000 rows.</summary>
+    public const int AffectedCap = 200;
+
+    [Parameter, EditorRequired] public QualityReport Report { get; set; } = default!;
+    [Parameter] public EventCallback<QualityProfile> OnProfileChanged { get; set; }
+    /// <summary>"Download JSON". The owner builds and saves the file; the button hides when unset.</summary>
+    [Parameter] public EventCallback OnDownload { get; set; }
+
+    // Context for the "Report a wrong result" prefill. All optional — the link works without them.
+    [Parameter] public string? AppVersion { get; set; }
+    [Parameter] public string? UserAgent { get; set; }
+    [Parameter] public string? FormatLabel { get; set; }
+
+    private string _search = "";
+
+    private Task SelectProfile(QualityProfile p) =>
+        p == Report.Profile ? Task.CompletedTask : OnProfileChanged.InvokeAsync(p);
+
+    private static string ProfileLabel(QualityProfile p) => new QualityReport(p, []).ProfileLabel;
+
+    private static double Pct(int n, int of) => of == 0 ? 0 : Math.Round((double)n / of * 100, 1);
+
+    private static (string Cls, string Icon, string Label) StatusDisplay(CheckStatus s) => s switch
+    {
+        CheckStatus.Pass    => ("q-pass", "✓", "Pass"),
+        CheckStatus.Partial => ("q-partial", "◐", "Partial"),
+        CheckStatus.Fail    => ("q-fail", "✕", "Fail"),
+        _                   => ("q-na", "–", "Not expressible in this format"),
+    };
+
+    private static string BarColor(CheckStatus s) => s switch
+    {
+        CheckStatus.Pass    => "var(--low)",
+        CheckStatus.Partial => "var(--med)",
+        _                   => "var(--crit)",
+    };
+
+    private static string DocStateText(QualityCheck c) => c.Status switch
+    {
+        CheckStatus.Pass    => "present",
+        CheckStatus.Partial => "declared unknown",
+        _                   => "missing",
+    };
+}
