@@ -1,0 +1,64 @@
+name: Claude — PR Review
+
+# Posts a code review when a PR is opened or marked ready. Comments only: the
+# review never approves, and never counts toward merge requirements. Ask for a
+# re-review after new pushes with "@claude review again" (claude.yml).
+#
+# Runs only for PRs from this repository opened by the owner or by Claude, so a
+# stranger's PR cannot spend the Claude subscription.
+on:
+  pull_request:
+    types: [opened, ready_for_review, reopened]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: >
+      !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.event.pull_request.user.login == github.repository_owner ||
+       github.event.sender.login == github.repository_owner)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          use_sticky_comment: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request against CLAUDE.md, which is the source of truth for
+            conventions in this repository. SBOM Viewer is a client-side Blazor WASM app:
+            there is no backend, and uploaded SBOMs must never leave the browser.
+
+            Look for, in this order:
+            1. Correctness bugs — wrong results, crashes, unhandled malformed SBOM input,
+               JsonDocument lifetime mistakes (dispose / ownership between SbomState and
+               SbomCompareState).
+            2. Privacy — any new network call, and whether it could send SBOM content anywhere.
+            3. Tests — behaviour changes without unit tests; UI changes without E2E tests;
+               tests that assert drifting data (e.g. exact vulnerability counts).
+            4. CLAUDE.md drift — architecture changed but CLAUDE.md not updated.
+            5. Release safety — changes to IndexedDB storage format that the previous release
+               could not read (rollback would meet the new data; see docs/runbook-rollback.md).
+
+            Only report real problems, each with file, line and a concrete failure scenario.
+            Skip style nits and praise. Use inline comments for specific lines, and one short
+            summary comment. If you find nothing, say so in one line.
+          claude_args: |
+            --max-turns 30
+            --allowedTools "Read,Glob,Grep,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"

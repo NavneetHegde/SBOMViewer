@@ -1,0 +1,6 @@
+# Changes here need the owner's review before merging (enforced by the main
+# ruleset's "require code owner review"). Agents may propose changes anywhere
+# else; the pipeline, its permissions and the infrastructure stay human-owned.
+/.github/       @NavneetHegde
+/Infra/         @NavneetHegde
+/Directory.Build.props @NavneetHegde

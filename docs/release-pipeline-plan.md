@@ -1,6 +1,6 @@
 # Release Pipeline — One Path to Production, With Rollback
 
-> Phase 0 done (v3.2.8). Phase 1 done (v3.2.9). Phase 2 done (v3.2.10). Phase 3 done (v3.2.11). Phase 4 in progress. Written 2026-11-15 after the v3.2.7 release.
+> Phase 0 done (v3.2.8). Phase 1 done (v3.2.9). Phase 2 done (v3.2.10). Phase 3 done (v3.2.11). Phase 4 done (v3.2.12). Phase 5 in progress. Written 2026-11-15 after the v3.2.7 release.
 
 ## Context
 
@@ -155,15 +155,18 @@ Guard rails:
 - [x] `rollback.yml`: resolve target (default: the release before the latest) → production approval → deploy that release's zip → smoke → revert branch.
 - [x] Revert as **one commit** with its own message, on `revert/vX`, plus a tracking issue with a "create the PR" link. **Changed from the original idea**: the workflow does not open the PR itself. Actions may not create PRs in this repo (kept that way deliberately), and a PR opened by `GITHUB_TOKEN` would not trigger the required CI. A PR you open does. This settles open decision 3.
 - [x] `docs/runbook-rollback.md`.
-- [ ] Rehearse, part 1 (now): run with `version=3.2.11` (the live version) — exercises approval, zip deploy and smoke; skips the revert.
+- [x] Rehearse, part 1: ran with `version=3.2.12` (the live version) on 2026-11-21 — resolve 7s, deploy 35s, smoke 50s, revert skipped. Passed.
 - [ ] Rehearse, part 2 (after v3.2.12): roll back to 3.2.11, create and merge the revert PR, confirm v3.2.13 ships without the change.
 
 ### Phase 5 — Agent workflows
 
-- [ ] Issue-to-PR workflow and PR review workflow.
-- [ ] `CODEOWNERS`; narrow admin bypass.
-- [ ] Automatic rollback *request* when the production smoke test fails.
-- [ ] Scheduled proposal loop, limited to opening issues.
+- [x] `claude.yml`: `feature-request` label or `@claude` comment → branch + create-PR link. Owner-only.
+- [x] `claude-review.yml`: review comments on owner PRs; never approves.
+- [x] `CODEOWNERS` for `.github/`, `Infra/`, `Directory.Build.props`; admin bypass narrowed to `pull_request` mode.
+- [x] Automatic rollback *request* when the production smoke test fails (`production-failed` job; `rollback.yml` gained `bad_commit` for the untagged case). Plus PR status comments after staging and after release.
+- [x] `claude-propose.yml`: weekly, at most one `proposal` issue; read-only otherwise.
+- [ ] Refresh `CLAUDE_CODE_OAUTH_TOKEN` (`claude setup-token`); the stored one dates from 2026-05-24 and has never been used.
+- [ ] First live run: label a small issue `feature-request` and follow it to production.
 
 ## Verification
 

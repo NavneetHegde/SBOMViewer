@@ -1,0 +1,60 @@
+name: Claude — Weekly Improvement Proposal
+
+# The self-improvement loop, kept on a short leash: once a week Claude reads the
+# plans, open issues and recent CI/release failures, and opens AT MOST ONE issue
+# labelled `proposal`. It cannot push, open PRs, or deploy.
+#
+# To act on a proposal, relabel it `feature-request` — that hands it to
+# claude.yml, which starts the normal reviewed path to production.
+on:
+  schedule:
+    - cron: '0 14 * * 1'   # Mondays 14:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: claude-propose
+  cancel-in-progress: false
+
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+
+            You are proposing the single most valuable next improvement for SBOM Viewer.
+
+            Read, in this order:
+            1. CLAUDE.md (architecture and conventions).
+            2. docs/feature-enhancements/ — planned features and their status.
+            3. Open issues: `gh issue list --state open --limit 50` (and view any that look related).
+            4. Recent failures: `gh run list --status failure --limit 20`.
+
+            Then decide:
+            - If an open issue labelled `proposal` already exists, do nothing and stop.
+            - Prefer, in order: a recurring CI or release failure; the next unstarted item in a
+              plan in docs/feature-enhancements/; a gap you can point to in the code.
+            - Never propose something an open issue already covers.
+
+            Open exactly one issue with `gh issue create --label proposal`. Title: the change in
+            plain words. Body: why now (cite the file, plan or failing run), what to change, how
+            to verify it, and its size (small / medium / large). Keep it under 300 words.
+            Do not open more than one issue. Do not modify any file.
+          claude_args: |
+            --max-turns 25
+            --allowedTools "Read,Glob,Grep,Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh run list:*),Bash(gh run view:*),Bash(gh label list:*)"

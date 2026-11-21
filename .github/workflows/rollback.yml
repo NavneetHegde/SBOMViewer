@@ -16,6 +16,10 @@ on:
         description: Version to put back in production, e.g. 3.2.11. Empty = the release before the latest.
         required: false
         default: ''
+      bad_commit:
+        description: Live but untagged commit to revert. Set automatically when a release fails its production smoke test (it never got a tag). Empty = the latest release.
+        required: false
+        default: ''
 
 # Shares the release queue: a rollback never races a release.
 concurrency:
@@ -31,6 +35,8 @@ jobs:
     outputs:
       target: ${{ steps.resolve.outputs.target }}
       bad: ${{ steps.resolve.outputs.bad }}
+      bad_ref: ${{ steps.resolve.outputs.bad_ref }}
+      bad_label: ${{ steps.resolve.outputs.bad_label }}
       revert: ${{ steps.resolve.outputs.revert }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -57,8 +63,19 @@ jobs:
             exit 1
           fi
 
+          # What is live and must be reverted on main: normally the latest tag; after a
+          # failed release, the untagged commit that failed.
+          BAD_COMMIT="${{ inputs.bad_commit }}"
+          if [ -n "$BAD_COMMIT" ]; then
+            BAD_REF="$BAD_COMMIT"; BAD_LABEL="${BAD_COMMIT:0:7}"
+          else
+            BAD_REF="v${BAD}"; BAD_LABEL="v${BAD}"
+          fi
+
           # Revert only when going back to an older version than the live one.
-          if [ "$TARGET" = "$BAD" ]; then
+          if [ -n "$BAD_COMMIT" ]; then
+            REVERT=true
+          elif [ "$TARGET" = "$BAD" ]; then
             REVERT=false
           elif [ "$(printf '%s\n%s\n' "$TARGET" "$BAD" | sort -V | head -1)" = "$TARGET" ]; then
             REVERT=true
@@ -69,9 +86,11 @@ jobs:
           echo "target=$TARGET" >> "$GITHUB_OUTPUT"
           echo "bad=$BAD" >> "$GITHUB_OUTPUT"
           echo "revert=$REVERT" >> "$GITHUB_OUTPUT"
+          echo "bad_ref=$BAD_REF" >> "$GITHUB_OUTPUT"
+          echo "bad_label=$BAD_LABEL" >> "$GITHUB_OUTPUT"
           {
             echo "### Rollback plan"
-            echo "- Live (latest release): **v${BAD}**"
+            echo "- Live: **${BAD_LABEL}**"
             echo "- Will deploy: **v${TARGET}** from \`${ZIP}\`"
             echo "- Revert branch on main: **${REVERT}**"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -126,7 +145,8 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
       TARGET: ${{ needs.resolve.outputs.target }}
-      BAD: ${{ needs.resolve.outputs.bad }}
+      BAD_REF: ${{ needs.resolve.outputs.bad_ref }}
+      BAD: ${{ needs.resolve.outputs.bad_label }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -138,26 +158,26 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          BRANCH="revert/v${BAD}"
+          BRANCH="revert/${BAD}"
           git switch -c "$BRANCH"
 
           # Code commits only, newest first. Docs-only commits never shipped
           # (release.yml ignores them), so they are left alone.
           COMMITS=""
-          for c in $(git rev-list --no-merges "v${TARGET}..v${BAD}"); do
+          for c in $(git rev-list --no-merges "v${TARGET}..${BAD_REF}"); do
             if git diff-tree --no-commit-id --name-only -r "$c" \
                  | grep -qvE '^docs/|^README\.md$|^CHANGELOG\.md$|\.txt$'; then
               COMMITS="$COMMITS $c"
             fi
           done
           if [ -z "$COMMITS" ]; then
-            echo "::notice::No code commits between v${TARGET} and v${BAD}; nothing to revert"
+            echo "::notice::No code commits between v${TARGET} and ${BAD}; nothing to revert"
             echo "pushed=false" >> "$GITHUB_OUTPUT"; exit 0
           fi
 
           if ! git revert --no-commit $COMMITS; then
             git revert --abort || true
-            echo "::error::Automatic revert hit a conflict. Production IS rolled back; revert v${TARGET}..v${BAD} on main by hand."
+            echo "::error::Automatic revert hit a conflict. Production IS rolled back; revert v${TARGET}..${BAD_REF} on main by hand."
             exit 1
           fi
 
@@ -166,10 +186,10 @@ jobs:
           # otherwise suppress CI on the revert PR.
           LIST=$(for c in $COMMITS; do git log -1 --format='- %h %s' "$c"; done | sed 's/\[skip ci\]//g; s/\[ci skip\]//g')
           git commit -q -F - <<MSG
-          revert: roll main back from v${BAD} to v${TARGET}
+          revert: roll main back from ${BAD} to v${TARGET}
 
           Production was rolled back to v${TARGET} by rollback.yml.
-          This reverts the code commits shipped in v${BAD}:
+          This reverts the code commits shipped in ${BAD}:
 
           ${LIST}
           MSG
@@ -184,9 +204,9 @@ jobs:
           LOG: ${{ steps.revert.outputs.log }}
           BRANCH: ${{ steps.revert.outputs.branch }}
         run: |
-          TITLE="Revert v${BAD}"
+          TITLE="Revert ${BAD}"
           LINK="${{ github.server_url }}/${GH_REPO}/compare/main...${BRANCH}?expand=1&title=$(printf '%s' "$TITLE" | sed 's/ /%20/g')"
-          BODY="Production was rolled back from **v${BAD}** to **v${TARGET}** by [this run](${{ github.server_url }}/${GH_REPO}/actions/runs/${{ github.run_id }}).
+          BODY="Production was rolled back from **${BAD}** to **v${TARGET}** by [this run](${{ github.server_url }}/${GH_REPO}/actions/runs/${{ github.run_id }}).
 
           **\`main\` still contains the bad code.** Until the revert merges, the next merge to \`main\` will ship it again.
 
@@ -196,5 +216,5 @@ jobs:
           ${LOG}
 
           To bring the change back later: fix it on a branch that starts by reverting the revert."
-          URL=$(gh issue create --title "Rolled back v${BAD} → v${TARGET}: revert pending" --body "$BODY")
+          URL=$(gh issue create --title "Rolled back ${BAD} → v${TARGET}: revert pending" --body "$BODY")
           echo "### Revert pending: [create the PR](${LINK}) · tracking issue ${URL}" >> "$GITHUB_STEP_SUMMARY"

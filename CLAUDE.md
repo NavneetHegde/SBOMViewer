@@ -56,6 +56,9 @@ SBOMViewer.slnx
 │   ├── release.yml                     # Push to main: build once → staging → approve → production → tag + release
 │   ├── smoke.yml                       # Reusable: Smoke-category E2E tests against a deployed site
 │   ├── rollback.yml                    # Manual: redeploy a previous release's zip, then push a revert branch
+│   ├── claude.yml                      # Agent: `feature-request` label or @claude comment → claude/* branch
+│   ├── claude-review.yml               # Agent: review comments on PRs (never approves)
+│   ├── claude-propose.yml              # Agent: weekly, opens at most one `proposal` issue
 │   └── deploy-bicep.yml                # Infrastructure deployment
 ├── docs/                               # Design docs and plans
 ├── samples/                            # Sample SBOM JSON files for testing
@@ -277,9 +280,31 @@ Uses **Microsoft.FluentUI.AspNetCore.Components** (v4.13.2) for all UI component
 | `release.yml` | Push to `main` | Compute version → build once → staging → smoke → **approval** → production → smoke → tag, GitHub release with the site zip attached |
 | `smoke.yml` | Called by `release.yml` and `rollback.yml`; manual | `Smoke`-category E2E tests against a URL, with `EXPECTED_VERSION` |
 | `rollback.yml` | Manual (`gh workflow run rollback.yml --ref main`) | **Approval** → redeploy a previous release's attached zip (no rebuild) → smoke → push `revert/vX` with one revert commit and open an issue linking to "create the PR". See `docs/runbook-rollback.md` |
+| `claude.yml` | `feature-request` label, or `@claude` comment — **owner only** | Claude implements on a `claude/*` branch and replies with a create-PR link |
+| `claude-review.yml` | PR opened / ready / reopened by the owner | Claude review: inline comments + one sticky summary. Comments only |
+| `claude-propose.yml` | Mondays 14:00 UTC; manual | Opens at most one `proposal` issue from plans, open issues and failures |
 | `deploy-bicep.yml` | Change to `Infra/main.bicep` | Deploy Azure infrastructure |
 
 Deploy jobs declare a GitHub Environment — `staging` (staging-sbomviewer app, staging.sbomviewer.com) or `production` (app-sbomviewer-eastus-001, sbomviewer.com; accepts `main` only, **required reviewer**). Each environment holds its own `AZURE_STATIC_WEB_APPS_API_TOKEN`, so a job gets the token of the environment it declares. The production approval is the release decision; rejecting it ends the run with no tag. Runs are serialized (`concurrency: release`), so a merge made while a run awaits approval queues behind it.
+
+### Agentic flow
+
+```
+issue + `feature-request` label ─► claude.yml: branch claude/issue-N-… + "create PR" link
+   you open the PR ─► ci.yml (required) + claude-review.yml (comments)
+   you squash-merge ─► release.yml: staging ─► smoke ─► PR comment "approve production"
+   you approve ─► production ─► smoke ─► tag + release ─► PR comment "released" (issue closes via "Closes #N")
+   production smoke fails ─► rollback.yml requested automatically (waits for your approval) + issue
+weekly ─► claude-propose.yml opens ≤1 `proposal` issue; relabel it `feature-request` to act on it
+```
+
+The agent never merges, approves, or deploys. The human gates are: opening the PR, merging it, and approving the `production` environment. Guard rails:
+
+- **Owner-only triggers.** The repo is public; every Claude workflow checks the sender is the repository owner, so nobody else can spend the Claude subscription or steer the agent.
+- **`.github/CODEOWNERS`** covers `.github/`, `Infra/` and `Directory.Build.props`; the `main` ruleset requires code-owner review. An agent cannot change the pipeline, its permissions or the release line without your review. Your own PRs touching those paths need the ruleset bypass at merge time (you cannot approve your own PR).
+- **Admin bypass is `pull_request` mode** — overrides happen only when merging a PR; nobody pushes to `main` directly.
+- **Actions may not create or approve PRs** (repo setting, kept off). Workflows push branches and post links instead; a PR you open runs the required CI.
+- `CLAUDE_CODE_OAUTH_TOKEN` (repo secret) authenticates the Claude workflows. Refresh with `claude setup-token` → `gh secret set CLAUDE_CODE_OAUTH_TOKEN`.
 
 ## Coding Conventions
 

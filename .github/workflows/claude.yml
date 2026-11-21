@@ -1,0 +1,58 @@
+name: Claude — Feature Request to Branch
+
+# The agentic entry point:
+#   label an issue `feature-request`  -> Claude implements it on a claude/* branch
+#   comment `@claude ...` on an issue or PR -> Claude answers or makes the change
+#
+# Claude pushes a branch and replies with a link to create the PR. You open the
+# PR, CI runs on it, Claude reviews it (claude-review.yml), you merge, and
+# release.yml takes it through staging and your production approval.
+#
+# Public repository: only the repository owner can trigger this, so nobody else
+# can spend the Claude subscription or steer the agent.
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  claude:
+    if: >
+      github.event.sender.login == github.repository_owner && (
+        (github.event_name == 'issues' && github.event.label.name == 'feature-request') ||
+        (github.event_name != 'issues' && contains(github.event.comment.body, '@claude'))
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read   # read CI results on PRs
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          label_trigger: feature-request
+          branch_name_template: '{{prefix}}{{entityType}}-{{entityNumber}}-{{description}}'
+          track_progress: true
+          claude_args: |
+            --max-turns 80
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(dotnet restore:*),Bash(dotnet build:*),Bash(dotnet test:*),Bash(dotnet format:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(gh issue view:*),Bash(gh pr view:*),Bash(gh pr diff:*)"
+            --append-system-prompt "You work on SBOM Viewer. Follow CLAUDE.md exactly. Rules: (1) Never edit anything under .github/ or Infra/; if the request needs that, say so and stop. (2) Every behaviour change gets unit tests in tests/SBOMViewer.Blazor.Tests, and E2E tests in tests/SBOMViewer.E2E.Tests for UI changes. (3) Run dotnet build SBOMViewer.slnx and dotnet test tests/SBOMViewer.Blazor.Tests before pushing; push only when both pass. (4) Never write [skip ci] or [ci skip] in a commit message. (5) Update CLAUDE.md when you change architecture it documents. (6) When you reply with the create-PR link, the PR body must say 'Closes #<issue number>'. (7) If the request is large or ambiguous, post a short plan as a comment and wait for '@claude go' instead of implementing."
