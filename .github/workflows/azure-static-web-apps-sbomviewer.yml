@@ -13,6 +13,11 @@ on:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
+    # Environment-scoped secret: AZURE_STATIC_WEB_APPS_API_TOKEN here is the
+    # production token. The environment only accepts main.
+    environment:
+      name: production
+      url: https://sbomviewer.com
     permissions:
       contents: write  # needed to create GitHub releases
     steps:

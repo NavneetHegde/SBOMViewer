@@ -277,6 +277,8 @@ Uses **Microsoft.FluentUI.AspNetCore.Components** (v4.13.2) for all UI component
 | `azure-static-web-apps-sbomviewer.yml` | Push to `main` | Build, unit tests, deploy to production SWA, create GitHub release |
 | `deploy-bicep.yml` | Change to `Infra/main.bicep` | Deploy Azure infrastructure |
 
+Deploy jobs declare a GitHub Environment — `staging` (staging-sbomviewer app, staging.sbomviewer.com; accepts `release/*` and `main`) or `production` (app-sbomviewer-eastus-001, sbomviewer.com; accepts `main` only). Each environment holds its own `AZURE_STATIC_WEB_APPS_API_TOKEN`, so a job gets the token of the environment it declares. `build-and-test` is a required check on `release/*`.
+
 ## Coding Conventions
 
 - **JSON handling**: Use `System.Text.Json.JsonDocument` for parsing uploaded files. No typed deserialization, no Newtonsoft.

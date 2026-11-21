@@ -79,6 +79,11 @@ jobs:
   release:
     needs: test
     runs-on: ubuntu-latest
+    # Environment-scoped secret: AZURE_STATIC_WEB_APPS_API_TOKEN here is the
+    # staging-sbomviewer token. The environment only accepts release/* and main.
+    environment:
+      name: staging
+      url: https://staging.sbomviewer.com
     permissions:
       contents: write       # push version-bump commit
       pull-requests: write  # create PR to main
@@ -122,7 +127,7 @@ jobs:
       - name: Deploy to staging.sbomviewer.com
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING }}
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           app_location: "publish_output/wwwroot"
