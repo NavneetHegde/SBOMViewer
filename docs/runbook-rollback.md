@@ -10,6 +10,13 @@ Use this when the version live on sbomviewer.com is broken and the fix is not mi
 
 Not for: cosmetic issues, or a problem that also exists in the previous version — rolling back would not fix those.
 
+## Automatic rollback request
+
+If a release fails its **production** smoke test, `release.yml` does not tag it. Instead it starts `rollback.yml` (back to the latest tagged release, with the failed commit as the one to revert) and opens an issue *"vX failed its production smoke test: rollback requested"*. The rollback still waits for your approval:
+
+- **Real failure** — approve it, then follow *Then fix `main`* below.
+- **Flaky smoke test** (check the `smoke-production` artifact) — reject the rollback and re-run the failed smoke job; if it passes, the release finishes and tags itself.
+
 ## Roll back
 
 1. Start the rollback. Empty `version` means "the release before the latest":

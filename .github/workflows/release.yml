@@ -170,3 +170,65 @@ jobs:
                 --generate-notes)
           [ -n "$PREV" ] && ARGS+=(--notes-start-tag "$PREV")
           gh release create "$TAG" "sbomviewer-${VERSION}.zip" "${ARGS[@]}"
+
+  # ---- Status back to the PR, and the automatic rollback request ----
+  # Notifications are best-effort: a failed comment never fails the release.
+
+  notify-staging:
+    needs: [build, smoke-staging]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - run: |
+          PR=$(gh api "repos/${GH_REPO}/commits/${GITHUB_SHA}/pulls" --jq '.[0].number // empty')
+          [ -z "$PR" ] && { echo "No PR for ${GITHUB_SHA}"; exit 0; }
+          gh pr comment "$PR" --body "**v${{ needs.build.outputs.version }}** is on [staging.sbomviewer.com](https://staging.sbomviewer.com) and passed its smoke test.
+
+          [Review the production deployment](${{ github.server_url }}/${GH_REPO}/actions/runs/${{ github.run_id }}) to ship it."
+
+  notify-release:
+    needs: [build, release]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - run: |
+          PR=$(gh api "repos/${GH_REPO}/commits/${GITHUB_SHA}/pulls" --jq '.[0].number // empty')
+          [ -z "$PR" ] && { echo "No PR for ${GITHUB_SHA}"; exit 0; }
+          V="${{ needs.build.outputs.version }}"
+          gh pr comment "$PR" --body "Released **[v${V}](${{ github.server_url }}/${GH_REPO}/releases/tag/v${V})** to [sbomviewer.com](https://sbomviewer.com)."
+
+  # Production is serving a build that failed its smoke test, and it has no tag.
+  # Request a rollback to the latest release (it still waits for your approval),
+  # with this commit as the one to revert on main.
+  production-failed:
+    needs: [build, smoke-production]
+    if: always() && needs.smoke-production.result == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write   # dispatch rollback.yml
+      issues: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - run: |
+          V="${{ needs.build.outputs.version }}"
+          LIVE=$(gh release view --json tagName --jq .tagName | sed 's/^v//')
+          gh workflow run rollback.yml --ref main -f version="$LIVE" -f bad_commit="$GITHUB_SHA"
+          gh issue create --title "v${V} failed its production smoke test: rollback requested" --body "The release run [${{ github.run_id }}](${{ github.server_url }}/${GH_REPO}/actions/runs/${{ github.run_id }}) deployed **v${V}** (commit ${GITHUB_SHA}) and its production smoke test failed. No tag was created.
+
+          A rollback to **v${LIVE}** has been requested. **Approve it** in [Actions → Rollback](${{ github.server_url }}/${GH_REPO}/actions/workflows/rollback.yml) to restore production. It then pushes a branch reverting ${GITHUB_SHA::7} and opens a revert issue.
+
+          If the smoke failure was a flake (check the smoke artifact), reject the rollback and re-run the smoke job instead."
