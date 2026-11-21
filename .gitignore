@@ -459,3 +459,4 @@ src/SBOMViewer.Blazor/wwwroot/sbomviewer_*.json
 
 #git
 .trees
+/.claude/hooks/format-cs.sh

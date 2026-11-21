@@ -1,12 +1,12 @@
 name: CI — Build, Unit and E2E Tests
 
-# Required status check on main and release/*. No paths-ignore here: a workflow
+# Required status check on main. No paths-ignore here: a workflow
 # filtered out by paths never reports, and a required check that never reports
 # blocks the PR forever. The `changes` job skips the work instead — a skipped
 # job counts as passing.
 on:
   pull_request:
-    branches: [main, 'release/*']
+    branches: [main]
 
 concurrency:
   group: ci-${{ github.event.pull_request.number }}

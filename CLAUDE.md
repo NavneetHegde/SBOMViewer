@@ -46,15 +46,15 @@ The E2E tests never start the app — with nothing listening they all fail in se
 
 ```
 SBOMViewer.slnx
-├── Directory.Build.props               # Centralized version (read/written by release-staging.yml)
+├── Directory.Build.props               # Release line (MAJOR.MINOR); patch comes from git tags
 ├── CLAUDE.md
 ├── AGENTS.md
 ├── Infra/
 │   └── main.bicep                      # Azure Static Web App infrastructure
 ├── .github/workflows/
-│   ├── ci.yml                          # PR validation: build + unit tests + E2E
-│   ├── release-staging.yml             # Push to release/*: bump patch, deploy staging, create PR to main
-│   ├── azure-static-web-apps-sbomviewer.yml  # Push to main: deploy + create GitHub release
+│   ├── ci.yml                          # PR validation: build + unit tests + E2E (required check)
+│   ├── release.yml                     # Push to main: build once → staging → approve → production → tag + release
+│   ├── smoke.yml                       # Reusable: Smoke-category E2E tests against a deployed site
 │   └── deploy-bicep.yml                # Infrastructure deployment
 ├── docs/                               # Design docs and plans
 ├── samples/                            # Sample SBOM JSON files for testing
@@ -144,7 +144,7 @@ SBOMViewer.slnx
 
 ### Versioning
 
-The app version lives in `Directory.Build.props` at the repo root and is inherited by all projects. `release-staging.yml` increments the patch segment on every merge to a `release/*` branch and commits it back with `[skip ci]`.
+`Directory.Build.props` holds only the release line: `<VersionPrefix>3.2.0</VersionPrefix>` plus `<VersionSuffix>local</VersionSuffix>`, so a local build reports `3.2.0-local`. Edit it by hand only for a minor or major bump. **The patch comes from git tags**: `release.yml` takes the highest `vMAJOR.MINOR.*` tag, adds one, and builds with `-p:Version=…`. Nothing commits a version back to the repo, and the tag is created only after production passes its smoke test — so a tag always means "this went live", always on a `main` commit. Tags are never moved or deleted.
 
 ### Data Flow
 
@@ -272,12 +272,12 @@ Uses **Microsoft.FluentUI.AspNetCore.Components** (v4.13.2) for all UI component
 
 | Workflow | Trigger | What it does |
 |----------|---------|--------------|
-| `ci.yml` | PR to `main` or `release/*` | Build, unit tests, Playwright E2E (skipped for docs-only changes); required check `build-and-test` |
-| `release-staging.yml` | Push to `release/*` | Bump patch in `Directory.Build.props`, deploy staging env, run all tests, open PR to `main` |
-| `azure-static-web-apps-sbomviewer.yml` | Push to `main` | Build, unit tests, deploy to production SWA, create GitHub release |
+| `ci.yml` | PR to `main` | Build, unit tests, Playwright E2E (skipped for docs-only changes); required check `build-and-test` |
+| `release.yml` | Push to `main` | Compute version → build once → staging → smoke → **approval** → production → smoke → tag, GitHub release with the site zip attached |
+| `smoke.yml` | Called by `release.yml`; manual | `Smoke`-category E2E tests against a URL, with `EXPECTED_VERSION` |
 | `deploy-bicep.yml` | Change to `Infra/main.bicep` | Deploy Azure infrastructure |
 
-Deploy jobs declare a GitHub Environment — `staging` (staging-sbomviewer app, staging.sbomviewer.com; accepts `release/*` and `main`) or `production` (app-sbomviewer-eastus-001, sbomviewer.com; accepts `main` only). Each environment holds its own `AZURE_STATIC_WEB_APPS_API_TOKEN`, so a job gets the token of the environment it declares. `build-and-test` is a required check on `release/*`.
+Deploy jobs declare a GitHub Environment — `staging` (staging-sbomviewer app, staging.sbomviewer.com) or `production` (app-sbomviewer-eastus-001, sbomviewer.com; accepts `main` only, **required reviewer**). Each environment holds its own `AZURE_STATIC_WEB_APPS_API_TOKEN`, so a job gets the token of the environment it declares. The production approval is the release decision; rejecting it ends the run with no tag. Runs are serialized (`concurrency: release`), so a merge made while a run awaits approval queues behind it.
 
 ## Coding Conventions
 
@@ -303,5 +303,4 @@ Deploy jobs declare a GitHub Environment — `staging` (staging-sbomviewer app, 
 
 ## Branch Strategy
 
-- `main` — production branch, triggers deployment and GitHub release creation
-- `release/*` — release branches; merges into these trigger patch version bump + staging deploy + auto-PR to `main`
+Trunk-based. Feature branches open a PR to `main` and are **squash-merged** (enforced by the ruleset), so one change is one commit and one `git revert` removes it. `build-and-test` must pass. Merging starts `release.yml`. The old `release/*` branches are kept as history only; nothing deploys from them.
