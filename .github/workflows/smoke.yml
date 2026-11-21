@@ -1,0 +1,79 @@
+name: Smoke Test
+
+# Runs the E2E tests tagged [Category("Smoke")] against a deployed site.
+# They are read-only, so they are safe against production. EXPECTED_VERSION
+# makes the footer test prove the new build is the one being served.
+on:
+  workflow_call:
+    inputs:
+      base_url:
+        required: true
+        type: string
+      version:
+        required: true
+        type: string
+      label:
+        description: Names the failure artifact (staging, production, rollback)
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Site to test
+        required: true
+        default: https://sbomviewer.com
+      version:
+        description: Version the footer must show
+        required: true
+      label:
+        description: Names the failure artifact
+        required: true
+        default: manual
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Black-box tests: no reference to the app, so this builds only the test project.
+      - run: dotnet build tests/SBOMViewer.E2E.Tests/SBOMViewer.E2E.Tests.csproj -c Release
+
+      - name: Install Playwright Chromium
+        run: pwsh tests/SBOMViewer.E2E.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps chromium
+
+      # A fresh deploy can take a few seconds to reach the edge. Wait until the
+      # served SBOM file for this version exists before testing.
+      - name: Wait for the new version to be served
+        run: |
+          URL="${{ inputs.base_url }}/sbomviewer_${{ inputs.version }}.json"
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null "$URL" && echo "Live after ~$((i * 10))s" && exit 0
+            sleep 10
+          done
+          echo "::error::$URL not served after 5 minutes"; exit 1
+
+      - name: Run smoke tests
+        env:
+          BASE_URL: ${{ inputs.base_url }}
+          EXPECTED_VERSION: ${{ inputs.version }}
+        run: |
+          dotnet test tests/SBOMViewer.E2E.Tests/SBOMViewer.E2E.Tests.csproj \
+            --no-build -c Release \
+            --filter "TestCategory=Smoke" \
+            --logger "trx;LogFileName=smoke.trx" \
+            --results-directory TestResults
+
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-${{ inputs.label }}-attempt${{ github.run_attempt }}
+          path: |
+            TestResults/
+            tests/SBOMViewer.E2E.Tests/bin/Release/net10.0/playwright-traces/
+          retention-days: 7
+          if-no-files-found: ignore

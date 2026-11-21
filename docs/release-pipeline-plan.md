@@ -1,6 +1,6 @@
 # Release Pipeline — One Path to Production, With Rollback
 
-> Phase 0 done (v3.2.8). Phase 1 done (v3.2.9). Phase 2 in progress. Written 2026-11-15 after the v3.2.7 release.
+> Phase 0 done (v3.2.8). Phase 1 done (v3.2.9). Phase 2 done (v3.2.10). Phase 3 in progress. Written 2026-11-15 after the v3.2.7 release.
 
 ## Context
 
@@ -135,19 +135,20 @@ Guard rails:
 ### Phase 2 — Environments
 
 - [x] Create `staging` (accepts `release/*`, `main`) and `production` (accepts `main` only) GitHub Environments.
-- [ ] Add yourself as required reviewer on `production` — **deferred to phase 3**. In the current flow, merging the release PR already is the production approval; a reviewer now would mean two clicks for one decision.
+- [x] Add yourself as required reviewer on `production` — done in phase 3. In the current flow, merging the release PR already is the production approval; a reviewer now would mean two clicks for one decision.
 - [x] Environment secrets: `AZURE_STATIC_WEB_APPS_API_TOKEN` in each environment holds that environment's app token; jobs declare `environment:`.
-- [ ] Delete the repository-level `AZURE_STATIC_WEB_APPS_API_TOKEN` and `AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING` once a release has gone through on the environment secrets.
+- [x] Delete the repository-level `AZURE_STATIC_WEB_APPS_API_TOKEN` and `AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING` once a release has gone through on the environment secrets.
 - [x] Staging has its own Static Web App — `staging-sbomviewer`, done in phase 0.
 
 ### Phase 3 — Single pipeline
 
-- [ ] New `release.yml` on push to `main`: compute version → build once → upload artifact → staging → smoke → production gate → deploy → smoke → tag → release with zip attached.
-- [ ] Concurrency: a newer merge supersedes a run still waiting for approval; a production deploy in flight is never cancelled.
-- [ ] Change `Directory.Build.props` to major.minor plus a `-local` default.
-- [ ] Set the `main` ruleset to squash-only.
-- [ ] Delete `release-staging.yml`, the old production workflow, the `release` ruleset and the `RELEASE_PAT_SBOM` secret. Leave old `release/*` branches in place as history.
-- [ ] Update `CLAUDE.md` and `AGENTS.md`: versioning, CI/CD table, branch strategy.
+- [x] New `release.yml` on push to `main`: compute version → build once → upload artifact → staging → smoke → production gate → deploy → smoke → tag → release with zip attached.
+- [x] Concurrency: one release at a time (`group: release`, no cancellation). **Changed from the original idea**: a merge made while a run waits for approval *queues* behind it rather than superseding it — GitHub cannot cancel a waiting run without also being able to cancel an in-flight production deploy. Approve or reject the waiting run and the queued one proceeds; only the newest queued run is kept.
+- [x] Change `Directory.Build.props` to `VersionPrefix` 3.2.0 + `VersionSuffix` local; the pipeline passes `-p:Version`.
+- [ ] Set the `main` ruleset to squash-only, and require `build-and-test` on `main`.
+- [x] Delete `release-staging.yml` and the old production workflow. Add reusable `smoke.yml`.
+- [ ] After the first release through `release.yml`: delete the `release` ruleset and the `RELEASE_PAT_SBOM` secret. Leave old `release/*` branches in place as history.
+- [x] Update `CLAUDE.md` and `README.md`: versioning, CI/CD table, branch strategy. (`AGENTS.md` has no release-flow content.)
 
 ### Phase 4 — Rollback
 
