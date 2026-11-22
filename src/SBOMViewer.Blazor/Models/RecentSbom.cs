@@ -3,9 +3,17 @@ namespace SBOMViewer.Blazor.Models;
 /// <summary>
 /// Metadata for one previously uploaded SBOM held in IndexedDB. The file content is fetched
 /// separately by <c>Id</c> so listing recents stays cheap.
+///
+/// <c>HasContent</c> is false once the file has aged out of the newest few kept in full: the entry
+/// is still remembered by name but cannot be reopened until the file is dropped again. Rows saved
+/// before the field existed omit it, so it defaults to true.
 /// </summary>
-public record RecentSbom(long Id, string Name, string Format, long Size, long SavedAt)
+public record RecentSbom(long Id, string Name, string Format, long Size, long SavedAt,
+                         string? Subject = null, bool HasContent = true)
 {
+    /// <summary>"bom.json · storefront 2.4.1", or just the name when the document has no subject.</summary>
+    public string DisplayName => string.IsNullOrWhiteSpace(Subject) ? Name : $"{Name} · {Subject}";
+
     public DateTimeOffset SavedAtUtc => DateTimeOffset.FromUnixTimeMilliseconds(SavedAt);
 
     /// <summary>Compact "how long ago" label, e.g. "just now", "12 min ago", "3 days ago".</summary>

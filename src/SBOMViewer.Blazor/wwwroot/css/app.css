@@ -810,8 +810,11 @@ body {
 .recent-clear:hover { color: var(--crit); text-decoration: underline; }
 
 .recent-list { flex: 1; min-width: 0; display: flex; gap: 8px; }
+
+/* One remembered file: the open button plus a × that forgets it (a sibling — buttons cannot nest). */
+.recent-entry { position: relative; flex: 1 1 0; min-width: 0; display: flex; }
 .recent-item {
-  flex: 1 1 0; min-width: 0;
+  flex: 1 1 0; min-width: 0; padding-right: 22px;
   display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
   padding: 5px 10px; border-radius: 8px; cursor: pointer;
   border: 1px solid var(--border); background: var(--bg);
@@ -825,6 +828,37 @@ body {
 .recent-item-meta {
   font-size: 0.6875rem; color: var(--text-dimmer);
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.recent-item-subject { font-family: var(--sans); color: var(--text-dim); }
+
+/* Only the name is still kept — the content aged out. Not clickable until the file is dropped again. */
+.recent-item-gone { cursor: default; border-style: dashed; background: transparent; }
+.recent-item-gone:hover { border-color: var(--border); background: transparent; }
+.recent-item-gone .recent-item-name { color: var(--text-dim); }
+.recent-item-gone .recent-item-meta { font-style: italic; }
+
+.recent-remove {
+  position: absolute; top: 3px; right: 3px;
+  width: 18px; height: 18px; padding: 0; line-height: 1;
+  border: none; border-radius: 4px; background: none; cursor: pointer;
+  font-size: 0.875rem; color: var(--text-dimmer); opacity: 0.6; transition: all 0.15s;
+}
+.recent-entry:hover .recent-remove, .recent-remove:focus-visible { opacity: 1; }
+.recent-remove:hover { color: var(--crit); background: var(--bg2); }
+
+.recent-more {
+  flex-shrink: 0; padding: 4px 8px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg);
+  font-size: 0.6875rem; color: var(--text-dim); white-space: nowrap;
+}
+.recent-more:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Older entries, shown on request under the strip. */
+.recent-panel {
+  flex: 1 1 100%;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px;
+  padding: 8px; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--bg2);
 }
 
 /* Short viewports (laptops): tighten the landing page so hero, quick row and both cards fit

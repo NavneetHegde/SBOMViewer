@@ -45,7 +45,7 @@
                 <span class="slot-recent-label">Recent:</span>
                 @foreach (var item in Recent)
                 {
-                    <button class="slot-recent-item" title="@($"{item.Name} · {item.Format}")"
+                    <button class="slot-recent-item" title="@($"{item.DisplayName} · {item.Format}")"
                             @onclick="() => PickRecent(item)">@item.Name</button>
                 }
             </div>

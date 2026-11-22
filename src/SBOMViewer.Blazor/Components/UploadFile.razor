@@ -32,19 +32,35 @@
         @if (_recent.Count > 0)
         {
             <div class="recent-bar">
-                <span class="recent-bar-title" title="Kept in this browser only — never uploaded anywhere.">Recent</span>
+                <span class="recent-bar-title" title="File names and recent files are kept in this browser only — never uploaded anywhere.">Recent</span>
                 <div class="recent-list">
-                    @foreach (var item in _recent)
+                    @foreach (var item in _recent.Take(StripCount))
                     {
-                        <button class="recent-item" @onclick="() => OpenRecent(item)"
-                                title="@($"{item.Name} — {item.Format} · {item.SizeLabel} · kept in this browser only")">
-                            <span class="recent-item-name">@item.Name</span>
-                            <span class="recent-item-meta">@item.Format · @item.SavedAgo(DateTimeOffset.Now)</span>
-                        </button>
+                        @RecentEntry(item)
                     }
                 </div>
-                <button class="recent-clear" @onclick="ClearRecent" title="Forget the files stored in this browser">Clear</button>
+                @if (_recent.Count > StripCount)
+                {
+                    <button class="recent-more" aria-expanded="@(_showOlder ? "true" : "false")"
+                            @onclick="() => _showOlder = !_showOlder"
+                            title="@(_showOlder ? "Hide older files" : "Show older files remembered in this browser")">
+                        @(_showOlder ? "Show less" : $"+{_recent.Count - StripCount} more")
+                    </button>
+                }
+                <button class="recent-clear" @onclick="ClearRecent" title="Forget every file stored in this browser">Clear</button>
             </div>
+
+            @* Opening the panel is the user's choice, so it may push the cards down; the collapsed
+               strip above must not. *@
+            @if (_showOlder && _recent.Count > StripCount)
+            {
+                <div class="recent-panel">
+                    @foreach (var item in _recent.Skip(StripCount))
+                    {
+                        @RecentEntry(item)
+                    }
+                </div>
+            }
         }
     </div>
 
@@ -110,6 +126,10 @@
     private int _dragCounter;
 
     private IReadOnlyList<RecentSbom> _recent = [];
+    private bool _showOlder;
+
+    /// <summary>Entries shown in the collapsed strip; the rest are behind "+n more".</summary>
+    private const int StripCount = 3;
 
     private bool _drag => _dragCounter > 0;
 
@@ -155,7 +175,7 @@
             var json = await Http.GetStringAsync(url);
 
             // Load(string, string) does not save to the recents store — a demo file must not
-            // evict one of the user's two real recents.
+            // evict one of the user's real recents.
             var result = SbomLoader.Load(json, SampleFileName);
             if (!result.Success)
             {
@@ -186,6 +206,39 @@
             _isLoading = false;
             StateHasChanged();
         }
+    }
+
+    /// <summary>
+    /// One remembered file: a button that reopens it, and a × that forgets it. The × is a sibling,
+    /// not a child — buttons cannot nest. An entry whose content has aged out stays listed by name
+    /// but cannot be opened until the file is dropped again (the hash then matches it).
+    /// </summary>
+    private RenderFragment RecentEntry(RecentSbom item) => @<div class="recent-entry" @key="item.Id">
+        @if (item.HasContent)
+        {
+            <button class="recent-item" @onclick="() => OpenRecent(item)"
+                    title="@($"{item.DisplayName} — {item.Format} · {item.SizeLabel} · kept in this browser only")">
+                <span class="recent-item-name">@item.Name@if (!string.IsNullOrEmpty(item.Subject)) {<span class="recent-item-subject"> · @item.Subject</span>}</span>
+                <span class="recent-item-meta">@item.Format · @item.SavedAgo(DateTimeOffset.Now)</span>
+            </button>
+        }
+        else
+        {
+            <button class="recent-item recent-item-gone" aria-disabled="true"
+                    title="@($"{item.DisplayName} — only the name is kept in this browser. Drop this file again to reopen it.")">
+                <span class="recent-item-name">@item.Name@if (!string.IsNullOrEmpty(item.Subject)) {<span class="recent-item-subject"> · @item.Subject</span>}</span>
+                <span class="recent-item-meta">Drop this file again to reopen</span>
+            </button>
+        }
+        <button class="recent-remove" @onclick="() => RemoveRecent(item)"
+                title="@($"Forget {item.Name}")" aria-label="@($"Forget {item.DisplayName}")">×</button>
+    </div>;
+
+    private async Task RemoveRecent(RecentSbom item)
+    {
+        await RecentStore.RemoveAsync(item.Id);
+        await RefreshRecent();
+        if (_recent.Count <= StripCount) _showOlder = false;
     }
 
     private async Task OpenRecent(RecentSbom item)
@@ -225,6 +278,7 @@
     {
         await RecentStore.ClearAsync();
         await RefreshRecent();
+        _showOlder = false;
     }
 
     private void OnDragEnter() => _dragCounter++;

@@ -82,7 +82,7 @@
                 {
                     <p>Upload two SBOMs to see what changed between them.</p>
                     <p class="compare-hint-sub">
-                        Neither file is uploaded — the comparison runs entirely in this browser. The two most
+                        Neither file is uploaded — the comparison runs entirely in this browser. Your most
                         recent files are kept in this browser so you can reopen them later; clear them
                         any time from the home screen. The two documents may be in different formats.
                     </p>
@@ -276,7 +276,11 @@
 
     protected override void OnInitialized() => CompareState.OnChange += StateHasChanged;
 
-    protected override async Task OnInitializedAsync() => _recent = await RecentStore.ListAsync();
+    /// <summary>Shortcut chips per empty slot: only files that can still be opened, newest first.</summary>
+    private const int SlotRecentCount = 3;
+
+    protected override async Task OnInitializedAsync() =>
+        _recent = (await RecentStore.ListAsync()).Where(r => r.HasContent).Take(SlotRecentCount).ToList();
 
     public void Dispose() => CompareState.OnChange -= StateHasChanged;
 }
