@@ -57,12 +57,13 @@ Nothing here leaves your machine, and nothing is readable by us.
 
 | Where | What | Why |
 |---|---|---|
-| IndexedDB | Your **two most recent SBOM files**, in full | So you can reopen them without finding the file again |
+| IndexedDB | Your **five most recent SBOM files**, in full, and the **names of up to 20** recent files — file name, format, size, upload date, the name/version the document describes, and a SHA-256 fingerprint of the content | So you can reopen them without finding the file again, and so the same file is recognised when you drop it again |
 | localStorage | Theme, font scale | So the UI looks the same next visit |
 | Cookies | Google Analytics identifiers | Analytics, as above |
 
-The recent-files store holds complete file contents. It is local to your browser and can be emptied
-at any time with **Clear** on the home screen, or by clearing site data in your browser.
+The recent-files store holds complete file contents for the newest five files; older entries keep
+only the details listed above. It is local to your browser. Forget one file with its **×** on the
+home screen, all of them with **Clear**, or clear site data in your browser.
 
 If you use a shared or public machine, be aware that recent files persist until cleared.
 

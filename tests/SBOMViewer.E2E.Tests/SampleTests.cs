@@ -76,7 +76,9 @@ public class SampleTests : TestBase
         await Page.WaitForSelectorAsync(".dropzone", new() { Timeout = 30_000 });
 
         await Expect(Page.Locator(".recent-item")).ToHaveCountAsync(1, new() { Timeout = 15_000 });
-        await Expect(Page.Locator(".recent-item-name")).ToHaveTextAsync("cyclonedx-1.6-minimal.json");
+        // The entry also shows the document's subject ("· my-web-app 2.1.0") after the name.
+        await Expect(Page.Locator(".recent-item-name")).ToHaveTextAsync(
+            new System.Text.RegularExpressions.Regex(@"^cyclonedx-1\.6-minimal\.json( · .+)?$"));
 
         // And the store itself, independent of what the strip chooses to render.
         var stored = await Page.EvaluateAsync<string[]>("async () => (await window.sbomRecentList()).map(x => x.name)");

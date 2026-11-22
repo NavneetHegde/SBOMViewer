@@ -76,4 +76,88 @@ public class SbomLoaderTests
         result.Error.Should().Be("nope");
         result.Document.Should().BeNull();
     }
+
+    // ── Subject (the label shown beside the file name in recents) ──────────────────────────────
+
+    private static string? Subject(string json, SbomFormat format)
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(json);
+        return SbomLoader.ExtractSubject(doc.RootElement, format);
+    }
+
+    [Fact]
+    public void ExtractSubject_CycloneDx_UsesMetadataComponentNameAndVersion()
+    {
+        const string json = """
+            { "bomFormat": "CycloneDX", "specVersion": "1.6",
+              "metadata": { "component": { "type": "application", "name": "storefront", "version": "2.4.1" } },
+              "components": [] }
+            """;
+
+        Subject(json, SbomFormat.CycloneDX_1_6).Should().Be("storefront 2.4.1");
+    }
+
+    [Fact]
+    public void ExtractSubject_CycloneDx_NameWithoutVersion()
+    {
+        const string json = """
+            { "metadata": { "component": { "name": "storefront" } } }
+            """;
+
+        Subject(json, SbomFormat.CycloneDX_1_5).Should().Be("storefront");
+    }
+
+    [Fact]
+    public void ExtractSubject_CycloneDx_NoMetadataComponent_IsNull()
+    {
+        Subject(TestData.TestJson.ValidCycloneDXWithComponents, SbomFormat.CycloneDX_1_6).Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(SbomFormat.SPDX_2_2)]
+    [InlineData(SbomFormat.SPDX_2_3)]
+    public void ExtractSubject_Spdx2_UsesDocumentName(SbomFormat format)
+    {
+        Subject(TestData.TestJson.ValidSpdxMinimal, format).Should().Be("Test SBOM");
+    }
+
+    [Fact]
+    public void ExtractSubject_Spdx3_UsesSpdxDocumentElementName()
+    {
+        Subject(TestData.TestJson.ValidSpdx30WithPackages, SbomFormat.SPDX_3_0)
+            .Should().Be("Test SBOM with packages");
+    }
+
+    [Fact]
+    public void ExtractSubject_Spdx3_NoSpdxDocument_IsNull()
+    {
+        const string json = """
+            { "@graph": [ { "type": "CreationInfo", "specVersion": "3.0.1" } ] }
+            """;
+
+        Subject(json, SbomFormat.SPDX_3_0).Should().BeNull();
+    }
+
+    [Fact]
+    public void ExtractSubject_BlankName_IsNull()
+    {
+        Subject("""{ "name": "   " }""", SbomFormat.SPDX_2_3).Should().BeNull();
+    }
+
+    [Fact]
+    public void ExtractSubject_LongName_IsTruncated()
+    {
+        var longName = "https://example.org/spdxdocs/" + new string('x', 100);
+        var subject = Subject($$"""{ "name": "{{longName}}" }""", SbomFormat.SPDX_2_3);
+
+        subject.Should().NotBeNull();
+        subject!.Length.Should().Be(SbomLoader.MaxSubjectLength);
+        subject.Should().EndWith("…");
+    }
+
+    [Fact]
+    public void ExtractSubject_NoFormat_IsNull()
+    {
+        Subject(TestData.TestJson.ValidSpdxMinimal, (SbomFormat)999).Should().BeNull();
+    }
 }

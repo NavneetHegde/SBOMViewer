@@ -44,7 +44,8 @@ public class SbomLoader(SchemaService schemaService, RecentSbomStore? recentStor
         // to re-parse a document when handing it between the viewer and the compare page, and those
         // hand-offs must not churn the recent history.
         if (result.Success && recentStore is not null)
-            await recentStore.SaveAsync(result.FileName!, result.Format, content);
+            await recentStore.SaveAsync(result.FileName!, result.Format, content,
+                ExtractSubject(result.Document!.RootElement, result.Format));
 
         return result;
     }
@@ -89,4 +90,70 @@ public class SbomLoader(SchemaService schemaService, RecentSbomStore? recentStor
             fileName,
             null);
     }
+
+    /// <summary>Longest subject kept; SPDX 2.x document names are often generated paths.</summary>
+    public const int MaxSubjectLength = 60;
+
+    /// <summary>
+    /// A short label for what the document describes — "storefront 2.4.1" — shown beside the file
+    /// name in the recents list so two files both called bom.json can be told apart. Null when the
+    /// document does not say.
+    /// </summary>
+    public static string? ExtractSubject(JsonElement root, SbomFormat? format)
+    {
+        string? subject = format switch
+        {
+            SbomFormat.CycloneDX_1_5 or SbomFormat.CycloneDX_1_6 or SbomFormat.CycloneDX_1_7
+                => CycloneDxSubject(root),
+            SbomFormat.SPDX_2_2 or SbomFormat.SPDX_2_3
+                => StringProp(root, "name"),
+            SbomFormat.SPDX_3_0
+                => Spdx3Subject(root),
+            _ => null
+        };
+
+        subject = subject?.Trim();
+        if (string.IsNullOrEmpty(subject))
+            return null;
+
+        return subject.Length <= MaxSubjectLength
+            ? subject
+            : subject[..(MaxSubjectLength - 1)].TrimEnd() + "…";
+    }
+
+    private static string? CycloneDxSubject(JsonElement root)
+    {
+        if (!root.TryGetProperty("metadata", out var metadata) || metadata.ValueKind != JsonValueKind.Object ||
+            !metadata.TryGetProperty("component", out var component) || component.ValueKind != JsonValueKind.Object)
+            return null;
+
+        var name = StringProp(component, "name")?.Trim();
+        if (string.IsNullOrEmpty(name))
+            return null;
+
+        var version = StringProp(component, "version")?.Trim();
+        return string.IsNullOrEmpty(version) ? name : $"{name} {version}";
+    }
+
+    private static string? Spdx3Subject(JsonElement root)
+    {
+        if (!root.TryGetProperty("@graph", out var graph) || graph.ValueKind != JsonValueKind.Array)
+            return null;
+
+        foreach (var element in graph.EnumerateArray())
+        {
+            if (element.ValueKind == JsonValueKind.Object &&
+                StringProp(element, "type") == "SpdxDocument")
+                return StringProp(element, "name");
+        }
+
+        return null;
+    }
+
+    private static string? StringProp(JsonElement obj, string name) =>
+        obj.ValueKind == JsonValueKind.Object &&
+        obj.TryGetProperty(name, out var value) &&
+        value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
 }

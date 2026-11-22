@@ -82,7 +82,7 @@ SBOMViewer.slnx
 │       ├── Services/
 │       │   ├── SbomState.cs            # Singleton state: JsonDocument, SchemaNode, format, filename
 │       │   ├── SbomLoader.cs           # Shared detect → validate → build-schema pipeline (+ saves recents)
-│       │   ├── RecentSbomStore.cs      # IndexedDB-backed last-2-uploads store (best-effort)
+│       │   ├── RecentSbomStore.cs      # IndexedDB recents: content-hash identity, 5 files / 20 names (best-effort)
 │       │   ├── SbomCompareState.cs     # Singleton state: baseline + current documents, computed diff
 │       │   ├── SbomDiffService.cs      # Component-level diff over ComponentRow lists
 │       │   ├── SbomFormatDetector.cs   # Format detection + lightweight required-field validation
@@ -126,7 +126,8 @@ SBOMViewer.slnx
     │       ├── ChatStateTests.cs       # ChatState event, clear, and vuln state tests
     │       ├── PackageExtractorTests.cs    # Package extraction from CycloneDX (1.5/1.6/1.7) + SPDX (2.2/2.3/3.0)
     │       ├── ComponentRowExtractorTests.cs # ComponentRow extraction + license risk classification per format
-    │       ├── SbomLoaderTests.cs       # Shared load pipeline: success, bad format, failed validation
+    │       ├── SbomLoaderTests.cs       # Shared load pipeline: success, bad format, failed validation, recents subject
+    │       ├── RecentSbomStoreTests.cs  # Content hash (SHA-256 vector, UTF-8), DisplayName, HasContent default
     │       ├── SampleSbomTests.cs       # Bundled demo SBOM: loads, scannable, license mix, dependencies resolve
     │       ├── SbomDiffServiceTests.cs  # purl identity, add/remove/version/license, cross-format, edge cases
     │       ├── SbomCompareStateTests.cs # Two-slot state, diff recomputation, clear/replace
@@ -141,7 +142,7 @@ SBOMViewer.slnx
         ├── HomePageTests.cs            # Smoke tests: title, header, upload button, badges, card, theme, footer
         ├── FileUploadTests.cs          # Upload tests: CycloneDX 1.5/1.6/1.7, SPDX 2.2/2.3/3.0.1, unsupported, invalid JSON, search
         ├── CompareTests.cs             # /compare route, two-slot upload, identical files, cross-format diff, swap, reset
-        ├── RecentSbomTests.cs          # IndexedDB persistence, 2-entry cap, dedup, clear, slot shortcut
+        ├── RecentSbomTests.cs          # IndexedDB persistence, hash identity, 5/20 caps, upgrade path, remove, layout, slot chips
         ├── SampleTests.cs              # "Try a sample" link, Sample chip, /?sample=1 deep link, recents untouched
         └── QualityTests.cs             # Quality tab: headline, profile switch, expand check, Overview card, JSON download, zero requests
 ```
@@ -226,12 +227,15 @@ Document-level actions (Export Report, Compare, New file) live in the top nav in
 
 ### Recent SBOMs (IndexedDB)
 
-The most recent **2** uploads are kept in IndexedDB so they can be reopened on a later visit without locating the file again. Storage is local to the browser — nothing is transmitted.
+Recent uploads are kept in IndexedDB so they can be reopened on a later visit without locating the file again: the **full content of the newest 5**, and the **metadata of up to 20**. Storage is local to the browser — nothing is transmitted. Plan: `docs/feature-enhancements/November26/03-recents-identity-and-caps.md`.
 
-- **`wwwroot/js/sbom-recent.js`** — flat `sbomRecent*` globals (`Save`/`List`/`Get`/`Clear`), matching the naming convention of the inline scripts in `index.html`. Metadata and file content live in **separate object stores** so listing recents does not read tens of megabytes back out. `sbomRecentSave` does all its reads and writes inside one transaction — awaiting between steps would let the transaction go inactive. Re-uploading a file replaces its earlier entry rather than duplicating it
-- **`RecentSbomStore`** — thin interop wrapper. **Every call is best-effort**: IndexedDB is unavailable in some private-browsing modes, can be disabled, and can hit quota. Failures degrade to "no recents" and must never break an upload
+- **Identity is the content hash, not the file name** — SBOMs are very often all called `bom.json`. `RecentSbomStore.ContentHash` computes SHA-256 (lower-case hex of the UTF-8) **in .NET, not `crypto.subtle`**, because the managed implementation also works outside a secure context. A hash match updates the existing entry (keeps its id; new name, `savedAt`, content restored). Rows saved by builds before hashing have no `hash`; they are matched by **`name` + `size`** and adopt the incoming hash, so upgrading users get no duplicate — there is no backfill pass and no `DB_VERSION` bump
+- **`wwwroot/js/sbom-recent.js`** — flat `sbomRecent*` globals (`Save`/`List`/`Get`/`Remove`/`Clear`), matching the naming convention of the inline scripts in `index.html`. Metadata and file content live in **separate object stores** so listing recents does not read tens of megabytes back out. `sbomRecentSave(name, format, content, hash, subject)` does all its reads and writes inside one transaction — awaiting between steps would let the transaction go inactive — and resolves with the entry id (feature 4 attaches scans to it)
+- **Two-stage eviction** (`MAX_CONTENT` 5 / `MAX_ENTRIES` 20, mirrored by `RecentSbomStore.MaxContent` / `MaxEntries`): beyond the newest 5 only the `content` row is deleted and the entry gets `hasContent: false`; beyond 20 the entry goes. Re-dropping a content-less file makes it the newest, so the 5th-newest loses its content in the same save. Ordering is `savedAt` desc with the id as tiebreaker. A missing `hasContent` (old row) means `true` — normalised in `sbomRecentList` and defaulted on `RecentSbom`
+- **Subject** — `SbomLoader.ExtractSubject` stores a label from inside the document (CycloneDX `metadata.component` name + version; SPDX 2.x document `name`; SPDX 3.0.1 `SpdxDocument` `name`), trimmed and capped at 60 chars, so same-named entries read `bom.json · storefront 2.4.1`
+- **`RecentSbomStore`** — thin interop wrapper. **Every call is best-effort**: IndexedDB is unavailable in some private-browsing modes, can be disabled, and can hit quota. Failures degrade to "no recents" (`SaveAsync` returns null) and must never break an upload
 - **`SbomLoader.LoadAsync`** saves; the `Load(string, string)` overload does not. That split is deliberate — the string overload is used to re-parse a document when handing it between the viewer and the compare page, and those hand-offs must not churn the history
-- **UI** — a compact "Recent" strip in the `.quick-row` above the two cards on the landing page, beside the "Try a sample" button (click to reopen, plus Clear) — above, not below, so neither is pushed under the fold, and `Recent:` shortcut chips inside an empty comparison slot. The chips sit *outside* the dropzone because the `InputFile` overlay covers that whole area
+- **UI** — a compact "Recent" strip in the `.quick-row` above the two cards on the landing page, beside the "Try a sample" button — above, not below, so neither is pushed under the fold. The strip shows the **newest 3** (`UploadFile.StripCount`); "+n more" opens `.recent-panel` with the rest — the collapsed strip must keep the landing page scroll-free (`RecentSbomTests` checks at 1366×650 and 1400×900). Each `.recent-entry` is an open button plus a sibling **×** (`RemoveAsync`; buttons cannot nest); a content-less entry is `aria-disabled` and reads "Drop this file again to reopen". Clear forgets everything. On `/compare`, `Compare.razor` passes only entries with content, newest 3, as `Recent:` chips inside an empty slot. The chips sit *outside* the dropzone because the `InputFile` overlay covers that whole area
 
 Because files now persist, the compare page's privacy copy says "nothing is sent to a server" rather than the previous "nothing is stored".
 
